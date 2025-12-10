@@ -1,4 +1,4 @@
-# Projeto React + Vite + Tailwind CSS + shadcn/ui
+# Sistema Web de Avaliação Periódica de Cursos de Graduação no IFB
 
 ## 📋 Tecnologias Utilizadas
 
