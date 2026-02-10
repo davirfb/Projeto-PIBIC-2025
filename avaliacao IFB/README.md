@@ -1,73 +1,82 @@
-# React + TypeScript + Vite
+# Avaliação IFB – React + Vite + Tailwind (shadcn-style)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Projeto em React + Vite configurado com Tailwind CSS 4 e componentes no estilo **shadcn/ui** (utilizando `class-variance-authority`, `tailwind-merge`, etc.).
 
-Currently, two official plugins are available:
+Este guia explica como rodar o projeto em **qualquer computador**.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+---
 
-## React Compiler
+## Requisitos
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **Node.js** (versão LTS recomendada)  
+  Você pode conferir se está instalado com:
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+node -v
+npm -v
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+---
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Como rodar o projeto pela primeira vez
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+1. **Clonar ou copiar o projeto**
+   - Se estiver usando Git:
+     ```bash
+     git clone <url-do-repositorio>
+     cd "avaliacao IFB"
+     ```
+   - Ou copie a pasta `avaliacao IFB` para o outro computador (não é necessário copiar `node_modules`).
+
+2. **Instalar as dependências**
+
+   Dentro da pasta `avaliacao IFB`:
+
+   ```bash
+   npm install
+   ```
+
+   Isso usa `package.json` e `package-lock.json` para instalar as mesmas versões de bibliotecas (React, Vite, Tailwind, shadcn-utils, etc.).
+
+3. **Rodar em modo desenvolvimento**
+
+   Ainda dentro de `avaliacao IFB`:
+
+   ```bash
+   npm run dev
+   ```
+
+   Em seguida, abra no navegador o endereço mostrado no terminal (geralmente `http://localhost:5173`).
+
+---
+
+## Build de produção (opcional)
+
+Para gerar os arquivos otimizados de produção:
+
+```bash
+npm run build
 ```
+
+Para pré-visualizar a build:
+
+```bash
+npm run preview
+```
+
+---
+
+## Tecnologias principais
+
+- **React** + **TypeScript**
+- **Vite**
+- **Tailwind CSS 4**
+- Utilitários no estilo **shadcn/ui**:
+  - `class-variance-authority`
+  - `clsx`
+  - `tailwind-merge`
+  - `tailwindcss-animate`
+  - `@radix-ui/react-slot`
+  - `lucide-react`
+
+
