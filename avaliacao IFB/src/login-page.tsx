@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { Mail, Lock, Eye } from "lucide-react"
 
 import {
@@ -13,7 +14,36 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 
-export function LoginPage() {
+type LoginRole = "aluno" | "admin"
+
+interface LoginPageProps {
+  onLogin?: (role: LoginRole) => void
+}
+
+export function LoginPage({ onLogin }: LoginPageProps) {
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [error, setError] = useState("")
+
+  function handleSubmit(event: React.FormEvent) {
+    event.preventDefault()
+    const normalizedEmail = email.trim().toLowerCase()
+
+    if (normalizedEmail === "aluno@ifb.edu.br") {
+      onLogin?.("aluno")
+      setError("")
+      return
+    }
+
+    if (normalizedEmail === "admin@ifb.edu.br") {
+      onLogin?.("admin")
+      setError("")
+      return
+    }
+
+    setError("Credenciais inválidas. Use aluno@ifb.edu.br ou admin@ifb.edu.br.")
+  }
+
   return (
     <div className="min-h-screen bg-[#F4F7FB] flex items-center justify-center px-6 py-10">
       <div className="max-w-6xl w-full grid gap-12 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] items-center">
@@ -80,60 +110,73 @@ export function LoginPage() {
             </CardDescription>
           </CardHeader>
 
-          <CardContent className="space-y-4 pt-2">
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-sm text-slate-700">
-                E-mail Institucional
-              </Label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-3 flex items-center text-slate-400">
-                  <Mail className="h-4 w-4" />
-                </span>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="seu.nome@ifb.edu.br"
-                  className="pl-9 bg-slate-50 border-slate-200 focus-visible:bg-white"
-                />
+          <form onSubmit={handleSubmit}>
+            <CardContent className="space-y-4 pt-2">
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-sm text-slate-700">
+                  E-mail Institucional
+                </Label>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-3 flex items-center text-slate-400">
+                    <Mail className="h-4 w-4" />
+                  </span>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="seu.nome@ifb.edu.br"
+                    className="pl-9 bg-slate-50 border-slate-200 focus-visible:bg-white"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                  />
+                </div>
               </div>
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="password" className="text-sm text-slate-700">
-                Senha
-              </Label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-3 flex items-center text-slate-400">
-                  <Lock className="h-4 w-4" />
-                </span>
-                <Input
-                  id="password"
-                  type="password"
-                  className="pl-9 pr-9 bg-slate-50 border-slate-200 focus-visible:bg-white"
-                />
-                <button
-                  type="button"
-                  className="absolute inset-y-0 right-3 flex items-center text-slate-400 hover:text-slate-600"
-                  aria-label="Mostrar senha"
-                >
-                  <Eye className="h-4 w-4" />
-                </button>
+              <div className="space-y-2">
+                <Label htmlFor="password" className="text-sm text-slate-700">
+                  Senha
+                </Label>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-3 flex items-center text-slate-400">
+                    <Lock className="h-4 w-4" />
+                  </span>
+                  <Input
+                    id="password"
+                    type="password"
+                    className="pl-9 pr-9 bg-slate-50 border-slate-200 focus-visible:bg-white"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="absolute inset-y-0 right-3 flex items-center text-slate-400 hover:text-slate-600"
+                    aria-label="Mostrar senha"
+                  >
+                    <Eye className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
-            </div>
-          </CardContent>
 
-          <CardFooter className="flex flex-col gap-4 pt-2">
-            <Button className="w-full h-11 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold">
-              Entrar
-            </Button>
+              {error && (
+                <p className="text-sm text-red-500">{error}</p>
+              )}
+            </CardContent>
 
-            <div className="w-full text-center text-sm text-slate-500 space-y-1">
-              <p>Esqueceu sua senha?</p>
-              <p className="text-xs">
-                Problemas de acesso? Contate a secretaria acadêmica.
-              </p>
-            </div>
-          </CardFooter>
+            <CardFooter className="flex flex-col gap-4 pt-2">
+              <Button
+                type="submit"
+                className="w-full h-11 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold"
+              >
+                Entrar
+              </Button>
+
+              <div className="w-full text-center text-sm text-slate-500 space-y-1">
+                <p>Esqueceu sua senha?</p>
+                <p className="text-xs">
+                  Problemas de acesso? Contate a secretaria acadêmica.
+                </p>
+              </div>
+            </CardFooter>
+          </form>
         </Card>
       </div>
     </div>
