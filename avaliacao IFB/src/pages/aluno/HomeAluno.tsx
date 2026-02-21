@@ -1,11 +1,11 @@
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
-interface HomeAlunosProps {
+interface HomeAlunoProps {
   onVoltarLogin?: () => void
 }
 
-export function HomeAlunos({ onVoltarLogin }: HomeAlunosProps) {
+export function HomeAluno({ onVoltarLogin }: HomeAlunoProps) {
   return (
     <div className="min-h-screen bg-[#F4F7FB] flex items-center justify-center px-6 py-10">
       <div className="max-w-5xl w-full space-y-8">
@@ -48,4 +48,3 @@ export function HomeAlunos({ onVoltarLogin }: HomeAlunosProps) {
     </div>
   )
 }
-

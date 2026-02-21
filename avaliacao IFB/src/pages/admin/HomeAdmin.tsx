@@ -48,4 +48,3 @@ export function HomeAdmin({ onVoltarLogin }: HomeAdminProps) {
     </div>
   )
 }
-

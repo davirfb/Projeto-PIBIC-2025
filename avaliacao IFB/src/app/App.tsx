@@ -1,7 +1,7 @@
 import { useState } from "react"
-import { LoginPage } from "./login-page"
-import { HomeAlunos } from "./home-alunos"
-import { HomeAdmin } from "./home-admin"
+import { LoginPage } from "@/pages/auth/LoginPage"
+import { HomeAluno } from "@/pages/aluno/HomeAluno"
+import { HomeAdmin } from "@/pages/admin/HomeAdmin"
 
 type Page = "login" | "aluno" | "admin"
 
@@ -9,7 +9,7 @@ function App() {
   const [page, setPage] = useState<Page>("login")
 
   if (page === "aluno") {
-    return <HomeAlunos onVoltarLogin={() => setPage("login")} />
+    return <HomeAluno onVoltarLogin={() => setPage("login")} />
   }
 
   if (page === "admin") {
@@ -27,4 +27,3 @@ function App() {
 }
 
 export default App
-
