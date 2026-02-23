@@ -1,50 +1,46 @@
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { AppLayout } from "@/components/layout/AppLayout";
+import { ClipboardList, UserRound } from "lucide-react";
 
 interface HomeAlunoProps {
-  onVoltarLogin?: () => void
+  onVoltarLogin?: () => void;
+  userName?: string;
+  userRoleLabel?: string;
 }
 
-export function HomeAluno({ onVoltarLogin }: HomeAlunoProps) {
-  return (
-    <div className="min-h-screen bg-[#F4F7FB] flex items-center justify-center px-6 py-10">
-      <div className="max-w-5xl w-full space-y-8">
-        <header className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-emerald-600">
-              Sistema de Avaliação Institucional
-            </p>
-            <h1 className="mt-2 text-3xl font-semibold text-slate-900">
-              Bem-vindo, aluno!
-            </h1>
-            <p className="text-slate-500">
-              Aqui você visualiza e responde às avaliações disponíveis para suas
-              disciplinas.
-            </p>
-          </div>
-          {onVoltarLogin && (
-            <Button
-              variant="outline"
-              className="border-slate-200 text-slate-700"
-              onClick={onVoltarLogin}
-            >
-              Sair
-            </Button>
-          )}
-        </header>
+export function HomeAluno({
+  onVoltarLogin,
+  userName,
+  userRoleLabel,
+}: HomeAlunoProps) {
+  const navSections = [
+    {
+      title: "Menu Principal",
+      items: [
+        {
+          label: "Minhas Avaliacoes",
+          href: "#",
+          icon: <ClipboardList className="h-5 w-5" />,
+        },
+      ],
+    },
+    {
+      title: "Conta",
+      items: [
+        {
+          label: "Perfil",
+          href: "#",
+          icon: <UserRound className="h-5 w-5" />,
+        },
+      ],
+    },
+  ];
 
-        <Card className="bg-white border-0 shadow-md shadow-slate-200/70 rounded-2xl">
-          <CardHeader>
-            <CardTitle className="text-lg font-semibold text-slate-900">
-              Avaliações do semestre
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-slate-500">
-            Nenhuma avaliação cadastrada ainda. Esta é uma página de exemplo
-            temporária para o fluxo de alunos.
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  )
+  return (
+    <AppLayout
+      onVoltarLogin={onVoltarLogin}
+      userName={userName}
+      userRoleLabel={userRoleLabel}
+      navSections={navSections}
+    />
+  );
 }
