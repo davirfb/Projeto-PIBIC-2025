@@ -17,14 +17,14 @@ export function AppLayout({
   navSections,
 }: AppLayoutProps) {
   return (
-    <div className="flex min-h-screen bg-slate-100">
+    <div className="flex h-screen overflow-hidden bg-slate-100">
       <Sidebar
         onVoltarLogin={onVoltarLogin}
         userName={userName}
         userRoleLabel={userRoleLabel}
         navSections={navSections}
       />
-      <main className="flex-1" aria-label="Conteudo principal">
+      <main className="flex-1 overflow-y-auto" aria-label="Conteudo principal">
         {children}
       </main>
     </div>

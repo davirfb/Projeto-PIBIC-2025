@@ -1,44 +1,30 @@
-import { useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
 import { LoginPage } from "@/pages/auth/LoginPage";
-import { HomeAluno } from "@/pages/aluno/HomeAluno";
-import { HomeAdmin } from "@/pages/admin/HomeAdmin";
-import type { LoginUser } from "@/pages/auth/LoginPage";
-
-type Page = "login" | "aluno" | "admin";
+import { HomeADM } from "@/pages/adm/HomeADM";
+import { HomeComissao } from "@/pages/comissao/HomeComissao";
+import { HomeRespondente } from "@/pages/respondente/HomeRespondente";
+import { HomePadrao } from "@/pages/padrao/HomePadrao";
 
 function App() {
-  const [page, setPage] = useState<Page>("login");
-  const [currentUser, setCurrentUser] = useState<LoginUser | null>(null);
+  const { user, isAuthenticated, login, logout } = useAuth();
 
-  if (page === "aluno") {
-    return (
-      <HomeAluno
-        onVoltarLogin={() => setPage("login")}
-        userName={currentUser?.name}
-        userRoleLabel="Aluno"
-      />
-    );
+  if (!isAuthenticated || !user) {
+    return <LoginPage onLogin={login} />;
   }
 
-  if (page === "admin") {
-    return (
-      <HomeAdmin
-        onVoltarLogin={() => setPage("login")}
-        userName={currentUser?.name}
-        userRoleLabel="Administrador"
-      />
-    );
+  if (user.role === "adm") {
+    return <HomeADM onLogout={logout} userName={user.name} />;
   }
 
-  return (
-    <LoginPage
-      onLogin={(user) => {
-        setCurrentUser(user);
-        if (user.role === "aluno") setPage("aluno");
-        if (user.role === "admin") setPage("admin");
-      }}
-    />
-  );
+  if (user.role === "comissao") {
+    return <HomeComissao onLogout={logout} userName={user.name} />;
+  }
+
+  if (user.role === "respondente") {
+    return <HomeRespondente onLogout={logout} userName={user.name} />;
+  }
+
+  return <HomePadrao onLogout={logout} userName={user.name} />;
 }
 
 export default App;
