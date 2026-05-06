@@ -1,5 +1,8 @@
 import { useState } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { useQuestionario } from "@/context/QuestionarioContext";
+import { ParticipacaoView } from "./ParticipacaoView";
+import { RelatoriosView } from "./RelatoriosView";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -20,7 +23,6 @@ import {
   ClipboardPlus,
   FileText,
   Plus,
-  Wrench,
   ClipboardCheck,
   Clock,
   Archive,
@@ -39,26 +41,6 @@ interface HomeComissaoProps {
   userName?: string;
 }
 
-function PendingSection({
-  title,
-  description,
-}: {
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="p-8">
-      <h2 className="text-xl font-semibold text-slate-900 mb-1">{title}</h2>
-      <p className="text-slate-500 text-sm mb-8">{description}</p>
-      <div className="flex flex-col items-center justify-center h-52 rounded-xl border-2 border-dashed border-slate-300 bg-white text-slate-400 gap-3">
-        <Wrench className="h-8 w-8" />
-        <p className="text-sm font-medium">
-          Em desenvolvimento — disponível na próxima etapa
-        </p>
-      </div>
-    </div>
-  );
-}
 
 const STATUS_CONFIG: Record<
   QuestionarioStatus,
@@ -339,19 +321,13 @@ function QuestionariosView({
 
 export function HomeComissao({ onLogout, userName }: HomeComissaoProps) {
   const [section, setSection] = useState<Section>("questionarios");
-  const [questionarios, setQuestionarios] = useState<Questionario[]>([]);
   const [editandoId, setEditandoId] = useState<string | null>(null);
+
+  const { questionarios, respostas, upsert, encerrar, arquivar, excluir } = useQuestionario();
 
   const questionarioEditando = editandoId
     ? questionarios.find((q) => q.id === editandoId)
     : undefined;
-
-  function upsert(q: Questionario) {
-    setQuestionarios((prev) => {
-      const existe = prev.some((p) => p.id === q.id);
-      return existe ? prev.map((p) => (p.id === q.id ? q : p)) : [...prev, q];
-    });
-  }
 
   function handleSalvarRascunho(q: Questionario) {
     upsert(q);
@@ -368,38 +344,6 @@ export function HomeComissao({ onLogout, userName }: HomeComissaoProps) {
   function handleEditar(id: string) {
     setEditandoId(id);
     setSection("form");
-  }
-
-  function handleEncerrar(id: string) {
-    setQuestionarios((prev) =>
-      prev.map((q) =>
-        q.id === id
-          ? {
-              ...q,
-              status: "encerrado",
-              atualizadoEm: new Date().toISOString(),
-            }
-          : q,
-      ),
-    );
-  }
-
-  function handleArquivar(id: string) {
-    setQuestionarios((prev) =>
-      prev.map((q) =>
-        q.id === id
-          ? {
-              ...q,
-              status: "arquivado",
-              atualizadoEm: new Date().toISOString(),
-            }
-          : q,
-      ),
-    );
-  }
-
-  function handleExcluir(id: string) {
-    setQuestionarios((prev) => prev.filter((q) => q.id !== id));
   }
 
   function handleCancelar() {
@@ -465,9 +409,9 @@ export function HomeComissao({ onLogout, userName }: HomeComissaoProps) {
             setSection("form");
           }}
           onEditar={handleEditar}
-          onEncerrar={handleEncerrar}
-          onArquivar={handleArquivar}
-          onExcluir={handleExcluir}
+          onEncerrar={encerrar}
+          onArquivar={arquivar}
+          onExcluir={excluir}
         />
       )}
       {section === "form" && (
@@ -479,16 +423,10 @@ export function HomeComissao({ onLogout, userName }: HomeComissaoProps) {
         />
       )}
       {section === "participacao" && (
-        <PendingSection
-          title="Painel de Participação"
-          description="Acompanhe a taxa de participação por curso, turma e sub-tipo de respondente."
-        />
+        <ParticipacaoView questionarios={questionarios} respostas={respostas} />
       )}
       {section === "relatorios" && (
-        <PendingSection
-          title="Relatórios"
-          description="Gere e exporte relatórios com os resultados das avaliações."
-        />
+        <RelatoriosView questionarios={questionarios} respostas={respostas} />
       )}
     </AppLayout>
   );

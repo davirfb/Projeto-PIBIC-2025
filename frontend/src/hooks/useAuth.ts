@@ -2,6 +2,7 @@ import { useState } from "react"
 import type { UserRole, UserSubType } from "@/types/user"
 
 interface AuthUser {
+  id: string
   email: string
   name: string
   role: UserRole
@@ -11,8 +12,8 @@ interface AuthUser {
 export function useAuth() {
   const [user, setUser] = useState<AuthUser | null>(null)
 
-  const login = (authUser: AuthUser) => {
-    setUser(authUser)
+  const login = (authUser: Omit<AuthUser, "id">) => {
+    setUser({ ...authUser, id: authUser.email })
   }
 
   const logout = () => {
