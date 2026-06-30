@@ -30,11 +30,13 @@ import {
   Trash2,
   StopCircle,
   CalendarDays,
+  TrendingUp,
 } from "lucide-react";
 import { QuestionarioForm } from "./QuestionarioForm";
+import { EvolucaoCursoView } from "./EvolucaoCursoView";
 import type { Questionario, QuestionarioStatus } from "@/types/questionario";
 
-type Section = "questionarios" | "form" | "participacao" | "relatorios";
+type Section = "questionarios" | "form" | "participacao" | "relatorios" | "evolucao";
 
 interface HomeComissaoProps {
   onLogout?: () => void;
@@ -390,6 +392,12 @@ export function HomeComissao({ onLogout, userName }: HomeComissaoProps) {
           active: section === "relatorios",
           onClick: () => setSection("relatorios"),
         },
+        {
+          label: "Evolução por Curso",
+          icon: <TrendingUp className="h-5 w-5" />,
+          active: section === "evolucao",
+          onClick: () => setSection("evolucao"),
+        },
       ],
     },
   ];
@@ -428,6 +436,7 @@ export function HomeComissao({ onLogout, userName }: HomeComissaoProps) {
       {section === "relatorios" && (
         <RelatoriosView questionarios={questionarios} respostas={respostas} />
       )}
+      {section === "evolucao" && <EvolucaoCursoView />}
     </AppLayout>
   );
 }

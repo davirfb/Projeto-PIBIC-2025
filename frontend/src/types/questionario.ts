@@ -37,6 +37,14 @@ export interface Questao {
   likertEscala?: LikertEscalaId
 }
 
+export interface Eixo {
+  id: string
+  nome: string
+  cor: string
+}
+
+export const EIXO_CORES = ["#10b981", "#3b82f6", "#f59e0b", "#a855f7", "#ef4444", "#06b6d4"]
+
 export interface Questionario {
   id: string
   titulo: string

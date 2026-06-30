@@ -91,21 +91,6 @@ export function LoginPage({ onLogin }: LoginPageProps) {
             </p>
           </div>
 
-          <Card className="max-w-xs bg-white/80 border-emerald-50 shadow-sm">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold text-slate-900">
-                Credenciais de Teste:
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 pt-0 text-xs font-mono">
-              {Object.entries(MOCK_CREDENTIALS).map(([mockEmail, { label }]) => (
-                <p key={mockEmail} className="flex items-center justify-between gap-2">
-                  <span className="truncate text-slate-600">{mockEmail}</span>
-                  <span className="text-slate-400">({label})</span>
-                </p>
-              ))}
-            </CardContent>
-          </Card>
         </div>
 
         {/* Coluna direita: card de login */}

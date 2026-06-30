@@ -97,12 +97,11 @@ function QuestaoLikert({
 }
 
 function QuestaoDissertativa({
-  questao,
   valor,
   onChange,
   erro,
 }: {
-  questao: Questao;
+  questao?: Questao;
   valor: string | undefined;
   onChange: (v: string) => void;
   erro: boolean;
@@ -133,7 +132,7 @@ export function ResponderView({
   function setResposta(questaoId: string, patch: Partial<RespostaQuestao>) {
     setRespostas((prev) => ({
       ...prev,
-      [questaoId]: { questaoId, ...prev[questaoId], ...patch },
+      [questaoId]: { ...prev[questaoId], ...patch, questaoId },
     }));
     setErros((prev) => ({ ...prev, [questaoId]: false }));
   }

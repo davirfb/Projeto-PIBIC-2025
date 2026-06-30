@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from "react"
+import { createContext, useContext, useState, useEffect } from "react"
 import type { ReactNode } from "react"
 import type { Questionario } from "@/types/questionario"
 import type { Resposta } from "@/types/resposta"
@@ -18,8 +18,26 @@ interface QuestionarioContextValue {
 const QuestionarioContext = createContext<QuestionarioContextValue | null>(null)
 
 export function QuestionarioProvider({ children }: { children: ReactNode }) {
-  const [questionarios, setQuestionarios] = useState<Questionario[]>([])
-  const [respostas, setRespostas] = useState<Resposta[]>([])
+  const [questionarios, setQuestionarios] = useState<Questionario[]>(() => {
+    try {
+      const stored = localStorage.getItem("ifb_questionarios")
+      return stored ? JSON.parse(stored) : []
+    } catch { return [] }
+  })
+  const [respostas, setRespostas] = useState<Resposta[]>(() => {
+    try {
+      const stored = localStorage.getItem("ifb_respostas")
+      return stored ? JSON.parse(stored) : []
+    } catch { return [] }
+  })
+
+  useEffect(() => {
+    localStorage.setItem("ifb_questionarios", JSON.stringify(questionarios))
+  }, [questionarios])
+
+  useEffect(() => {
+    localStorage.setItem("ifb_respostas", JSON.stringify(respostas))
+  }, [respostas])
 
   function upsert(q: Questionario) {
     setQuestionarios((prev) => {

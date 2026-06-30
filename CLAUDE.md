@@ -216,7 +216,7 @@ interface Resposta { id, questionarioId, respondentId: string|null, respondentRo
 | 3       | Módulo de questionários — Comissão (QuestionarioForm, HomeComissao, tipos)                     | ✅ Concluída |
 | 4       | Módulo de resposta — Respondente e Padrão (QuestionarioContext, ResponderView, fluxo completo) | ✅ Concluída |
 | 5       | Módulo de relatórios — Comissão (RF13–RF17)                                                    | ✅ Concluída |
-| 6       | Gestão administrativa — ADM (RF01–RF06)                                                        | Pendente     |
+| 6       | Gestão administrativa — ADM (RF01–RF06)                                                        | ✅ Concluída |
 | Backend | API REST Python/FastAPI — após todas as etapas frontend                                        | Pendente     |
 
 **Implementar sempre uma etapa por vez. Não antecipar funcionalidades de etapas futuras.**

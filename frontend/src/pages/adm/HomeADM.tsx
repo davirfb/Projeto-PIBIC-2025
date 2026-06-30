@@ -34,33 +34,6 @@ const STATUS_CONFIG = {
   arquivado: { label: "Arquivado", color: "bg-amber-50 text-amber-700 border-amber-200" },
 };
 
-const USUARIOS_INICIAIS: UsuarioAdm[] = [
-  { id: "u1", nome: "Administrador", email: "adm@ifb.edu.br", perfil: "adm", ativo: true, criadoEm: "2026-01-01T00:00:00.000Z" },
-  { id: "u2", nome: "Comissão IFB", email: "comissao@ifb.edu.br", perfil: "comissao", ativo: true, criadoEm: "2026-01-01T00:00:00.000Z" },
-  { id: "u3", nome: "Respondente", email: "respondente@ifb.edu.br", perfil: "respondente", subTipo: "aluno", ativo: true, criadoEm: "2026-01-01T00:00:00.000Z" },
-  { id: "u4", nome: "Padrão", email: "padrao@ifb.edu.br", perfil: "padrao", subTipo: "professor", ativo: true, criadoEm: "2026-01-01T00:00:00.000Z" },
-];
-
-const CURSOS_INICIAIS: Curso[] = [
-  {
-    id: "c1",
-    nome: "Análise e Desenvolvimento de Sistemas",
-    codigo: "ADS",
-    turmas: [
-      { id: "t1", nome: "ADS 2024/1", ano: 2024, semestre: 1 },
-      { id: "t2", nome: "ADS 2024/2", ano: 2024, semestre: 2 },
-    ],
-  },
-  {
-    id: "c2",
-    nome: "Administração",
-    codigo: "ADM",
-    turmas: [
-      { id: "t3", nome: "ADM 2024/1", ano: 2024, semestre: 1 },
-      { id: "t4", nome: "ADM 2024/2", ano: 2024, semestre: 2 },
-    ],
-  },
-];
 
 const CONFIG_INICIAL: Configuracoes = {
   nomeInstituicao: "Instituto Federal de Brasília",
@@ -75,8 +48,8 @@ function gerarId() {
 
 export function HomeADM({ onLogout, userName }: HomeADMProps) {
   const [section, setSection] = useState<Section>("dashboard");
-  const [usuarios, setUsuarios] = useState<UsuarioAdm[]>(USUARIOS_INICIAIS);
-  const [cursos, setCursos] = useState<Curso[]>(CURSOS_INICIAIS);
+  const [usuarios, setUsuarios] = useState<UsuarioAdm[]>([]);
+  const [cursos, setCursos] = useState<Curso[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [config, setConfig] = useState<Configuracoes>(CONFIG_INICIAL);
 

@@ -66,12 +66,12 @@ Avaliação de aprendizagem, gestão de matrículas e integração com SUAP/MEC 
 
 | ID | Descrição | Prioridade | Status |
 |---|---|---|---|
-| RF01 | Cadastrar, editar, desativar e excluir usuários | Alta | Pendente (Etapa 6) |
-| RF02 | Atribuir perfis e sub-tipos | Alta | Pendente (Etapa 6) |
-| RF03 | Cadastrar cursos, turmas e disciplinas | Alta | Pendente (Etapa 6) |
-| RF04 | Configurar parâmetros gerais da plataforma | Média | Pendente (Etapa 6) |
-| RF05 | Exibir painel de monitoramento com indicadores | Média | Pendente (Etapa 6) |
-| RF06 | Visualizar logs de atividades e auditoria | Média | Pendente (Etapa 6) |
+| RF01 | Cadastrar, editar, desativar e excluir usuários | Alta | ✅ Concluído (Etapa 6) |
+| RF02 | Atribuir perfis e sub-tipos | Alta | ✅ Concluído (Etapa 6) |
+| RF03 | Cadastrar cursos, turmas e disciplinas | Alta | ✅ Concluído (Etapa 6) |
+| RF04 | Configurar parâmetros gerais da plataforma | Média | ✅ Concluído (Etapa 6) |
+| RF05 | Exibir painel de monitoramento com indicadores | Média | ✅ Concluído (Etapa 6) |
+| RF06 | Visualizar logs de atividades e auditoria | Média | ✅ Concluído (Etapa 6) |
 
 ### 4.2 Perfil Comissão
 
