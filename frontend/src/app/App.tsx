@@ -7,14 +7,22 @@ import { HomePadrao } from "@/pages/padrao/HomePadrao";
 import { QuestionarioProvider } from "@/context/QuestionarioContext";
 
 function App() {
-  const { user, isAuthenticated, login, logout } = useAuth();
+  const { user, isAuthenticated, isLoading, login, logout } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#F4F7FB] flex items-center justify-center">
+        <p className="text-slate-400 text-sm">Carregando...</p>
+      </div>
+    );
+  }
 
   if (!isAuthenticated || !user) {
     return <LoginPage onLogin={login} />;
   }
 
   return (
-    <QuestionarioProvider>
+    <QuestionarioProvider userRole={user.role}>
       {user.role === "adm" && <HomeADM onLogout={logout} userName={user.name} />}
       {user.role === "comissao" && <HomeComissao onLogout={logout} userName={user.name} />}
       {user.role === "respondente" && (

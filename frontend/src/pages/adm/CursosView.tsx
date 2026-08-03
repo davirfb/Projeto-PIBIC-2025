@@ -15,7 +15,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Plus, Pencil, Trash2, ChevronDown, ChevronRight, GraduationCap } from "lucide-react";
+import { Plus, Pencil, Trash2, ChevronDown, ChevronRight, GraduationCap, Search, ClipboardList } from "lucide-react";
 import type { Curso, Turma } from "@/types/adm";
 
 interface CursosViewProps {
@@ -24,6 +24,7 @@ interface CursosViewProps {
   onExcluirCurso: (id: string) => void;
   onSalvarTurma: (cursoId: string, t: Turma) => void;
   onExcluirTurma: (cursoId: string, turmaId: string) => void;
+  onAbrirQuestionarios: (curso: Curso) => void;
 }
 
 interface FormCurso {
@@ -37,17 +38,20 @@ interface FormTurma {
   id: string | null;
   nome: string;
   ano: string;
-  semestre: "1" | "2";
+  semestre: string;
 }
 
 const FORM_CURSO_VAZIO: FormCurso = { id: null, nome: "", codigo: "" };
 
-export function CursosView({ cursos, onSalvarCurso, onExcluirCurso, onSalvarTurma, onExcluirTurma }: CursosViewProps) {
+const SEMESTRES = Array.from({ length: 10 }, (_, i) => i + 1);
+
+export function CursosView({ cursos, onSalvarCurso, onExcluirCurso, onSalvarTurma, onExcluirTurma, onAbrirQuestionarios }: CursosViewProps) {
   const [formCurso, setFormCurso] = useState<FormCurso | null>(null);
   const [formTurma, setFormTurma] = useState<FormTurma | null>(null);
   const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
   const [errosCurso, setErrosCurso] = useState<Record<string, string>>({});
   const [errosTurma, setErrosTurma] = useState<Record<string, string>>({});
+  const [busca, setBusca] = useState("");
 
   function toggleExpandido(id: string) {
     setExpandidos((prev) => {
@@ -87,12 +91,20 @@ export function CursosView({ cursos, onSalvarCurso, onExcluirCurso, onSalvarTurm
       id: formTurma.id ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`,
       nome: formTurma.nome.trim(),
       ano: Number(formTurma.ano),
-      semestre: Number(formTurma.semestre) as 1 | 2,
+      semestre: Number(formTurma.semestre),
     };
     onSalvarTurma(formTurma.cursoId, turma);
     setFormTurma(null);
     setErrosTurma({});
   }
+
+  const cursosFiltrados = busca.trim()
+    ? cursos.filter(
+        (c) =>
+          c.nome.toLowerCase().includes(busca.toLowerCase()) ||
+          c.codigo.toLowerCase().includes(busca.toLowerCase()),
+      )
+    : cursos;
 
   return (
     <div className="p-8 space-y-6">
@@ -149,20 +161,33 @@ export function CursosView({ cursos, onSalvarCurso, onExcluirCurso, onSalvarTurm
 
       <Card className="border-slate-200 shadow-sm bg-white">
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
             <CardTitle className="text-base text-slate-900">Lista de Cursos</CardTitle>
-            <Badge variant="outline" className="text-xs text-slate-500">{cursos.length} curso(s)</Badge>
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                <Input
+                  value={busca}
+                  onChange={(e) => setBusca(e.target.value)}
+                  placeholder="Buscar curso..."
+                  className="pl-8 h-8 text-xs border-slate-200 w-48"
+                />
+              </div>
+              <Badge variant="outline" className="text-xs text-slate-500 shrink-0">{cursos.length} curso(s)</Badge>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
-          {cursos.length === 0 ? (
+          {cursosFiltrados.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-40 text-slate-400 gap-2">
               <GraduationCap className="h-8 w-8" />
-              <p className="text-sm font-medium">Nenhum curso cadastrado.</p>
+              <p className="text-sm font-medium">
+                {cursos.length === 0 ? "Nenhum curso cadastrado." : "Nenhum curso encontrado para essa busca."}
+              </p>
             </div>
           ) : (
             <div className="space-y-2">
-              {cursos.map((curso) => {
+              {cursosFiltrados.map((curso) => {
                 const aberto = expandidos.has(curso.id);
                 return (
                   <div key={curso.id} className="rounded-xl border border-slate-200 overflow-hidden">
@@ -181,6 +206,15 @@ export function CursosView({ cursos, onSalvarCurso, onExcluirCurso, onSalvarTurm
                         {curso.turmas.length} turma(s)
                       </Badge>
                       <div className="flex items-center gap-1">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-2 border-blue-200 text-blue-600 hover:bg-blue-50 flex items-center gap-1 text-xs"
+                          onClick={() => onAbrirQuestionarios(curso)}
+                        >
+                          <ClipboardList className="h-3.5 w-3.5" />
+                          Questionários
+                        </Button>
                         <Button size="sm" variant="outline"
                           className="h-7 w-7 p-0 border-slate-200 text-slate-500 hover:bg-slate-50"
                           onClick={() => { setFormCurso({ id: curso.id, nome: curso.nome, codigo: curso.codigo }); setErrosCurso({}); }}
@@ -266,11 +300,12 @@ export function CursosView({ cursos, onSalvarCurso, onExcluirCurso, onSalvarTurm
                               </div>
                               <select
                                 value={formTurma.semestre}
-                                onChange={(e) => setFormTurma((f) => f && ({ ...f, semestre: e.target.value as "1" | "2" }))}
-                                className="rounded-md border border-slate-200 bg-white px-2 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                onChange={(e) => setFormTurma((f) => f && ({ ...f, semestre: e.target.value }))}
+                                className="col-span-2 rounded-md border border-slate-200 bg-white px-2 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                               >
-                                <option value="1">1º Semestre</option>
-                                <option value="2">2º Semestre</option>
+                                {SEMESTRES.map((n) => (
+                                  <option key={n} value={String(n)}>{n}º Semestre</option>
+                                ))}
                               </select>
                             </div>
                             <div className="flex gap-2">

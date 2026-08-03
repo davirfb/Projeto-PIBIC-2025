@@ -1,9 +1,8 @@
 import { useState } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
-  ClipboardList,
   Cog,
   GraduationCap,
   LayoutDashboard,
@@ -11,29 +10,30 @@ import {
   Users,
   TrendingUp,
   Activity,
+  ClipboardList,
+  ChevronLeft,
 } from "lucide-react";
 import { useQuestionario } from "@/context/QuestionarioContext";
 import { UsuariosView } from "./UsuariosView";
 import { CursosView } from "./CursosView";
 import { LogsView } from "./LogsView";
 import { ConfiguracoesView } from "./ConfiguracoesView";
+import { QuestionariosView } from "@/pages/comissao/HomeComissao";
+import { QuestionarioForm } from "@/pages/comissao/QuestionarioForm";
+import { ParticipacaoView } from "@/pages/comissao/ParticipacaoView";
+import { RelatoriosView } from "@/pages/comissao/RelatoriosView";
+import { EvolucaoCursoView } from "@/pages/comissao/EvolucaoCursoView";
 import type { UsuarioAdm, Curso, Turma, LogEntry, Configuracoes } from "@/types/adm";
 import type { UserRole } from "@/types/user";
+import type { Questionario } from "@/types/questionario";
 
-type Section = "dashboard" | "usuarios" | "cursos" | "questionarios" | "logs" | "configuracoes";
+type Section = "dashboard" | "usuarios" | "cursos" | "curso_questionarios" | "logs" | "configuracoes";
+type QuestionarioSub = "lista" | "form" | "participacao" | "relatorios" | "evolucao";
 
 interface HomeADMProps {
   onLogout?: () => void;
   userName?: string;
 }
-
-const STATUS_CONFIG = {
-  rascunho: { label: "Rascunho", color: "bg-slate-100 text-slate-600 border-slate-300" },
-  publicado: { label: "Publicado", color: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-  encerrado: { label: "Encerrado", color: "bg-blue-50 text-blue-700 border-blue-200" },
-  arquivado: { label: "Arquivado", color: "bg-amber-50 text-amber-700 border-amber-200" },
-};
-
 
 const CONFIG_INICIAL: Configuracoes = {
   nomeInstituicao: "Instituto Federal de Brasília",
@@ -52,8 +52,11 @@ export function HomeADM({ onLogout, userName }: HomeADMProps) {
   const [cursos, setCursos] = useState<Curso[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [config, setConfig] = useState<Configuracoes>(CONFIG_INICIAL);
+  const [cursoAtivo, setCursoAtivo] = useState<Curso | null>(null);
+  const [qSub, setQSub] = useState<QuestionarioSub>("lista");
+  const [editandoId, setEditandoId] = useState<string | null>(null);
 
-  const { questionarios, respostas } = useQuestionario();
+  const { questionarios, respostas, upsert, encerrar, arquivar, excluir } = useQuestionario();
 
   function registrarLog(acao: string, perfil: UserRole = "adm") {
     const entry: LogEntry = {
@@ -134,6 +137,13 @@ export function HomeADM({ onLogout, userName }: HomeADMProps) {
     if (turma) registrarLog(`Turma excluída: ${turma.nome}`);
   }
 
+  function handleAbrirQuestionarios(curso: Curso) {
+    setCursoAtivo(curso);
+    setQSub("lista");
+    setEditandoId(null);
+    setSection("curso_questionarios");
+  }
+
   function handleSalvarConfig(c: Configuracoes) {
     setConfig(c);
     registrarLog("Configurações da plataforma atualizadas");
@@ -142,6 +152,13 @@ export function HomeADM({ onLogout, userName }: HomeADMProps) {
   const ativosCount = usuarios.filter((u) => u.ativo).length;
   const publicadosCount = questionarios.filter((q) => q.status === "publicado").length;
   const logsRecentes = logs.slice(-5).reverse();
+
+  const questionariosDoCurso = cursoAtivo
+    ? questionarios.filter((q) => q.cursos.includes(cursoAtivo.id))
+    : [];
+  const respostasDoCurso = cursoAtivo
+    ? respostas.filter((r) => questionariosDoCurso.some((q) => q.id === r.questionarioId))
+    : [];
 
   const navSections = [
     {
@@ -167,14 +184,8 @@ export function HomeADM({ onLogout, userName }: HomeADMProps) {
         {
           label: "Cursos e Turmas",
           icon: <GraduationCap className="h-5 w-5" />,
-          active: section === "cursos",
+          active: section === "cursos" || section === "curso_questionarios",
           onClick: () => setSection("cursos"),
-        },
-        {
-          label: "Questionários",
-          icon: <ClipboardList className="h-5 w-5" />,
-          active: section === "questionarios",
-          onClick: () => setSection("questionarios"),
         },
         {
           label: "Logs de Auditoria",
@@ -262,6 +273,7 @@ export function HomeADM({ onLogout, userName }: HomeADMProps) {
       {section === "usuarios" && (
         <UsuariosView
           usuarios={usuarios}
+          cursos={cursos}
           onSalvar={handleSalvarUsuario}
           onExcluir={handleExcluirUsuario}
           onToggleAtivo={handleToggleAtivo}
@@ -275,53 +287,78 @@ export function HomeADM({ onLogout, userName }: HomeADMProps) {
           onExcluirCurso={handleExcluirCurso}
           onSalvarTurma={handleSalvarTurma}
           onExcluirTurma={handleExcluirTurma}
+          onAbrirQuestionarios={handleAbrirQuestionarios}
         />
       )}
 
-      {section === "questionarios" && (
-        <div className="p-8 space-y-6">
-          <div>
-            <h1 className="text-2xl font-semibold text-slate-900">Questionários</h1>
-            <p className="text-slate-500 mt-1">Visão geral de todos os questionários criados pelas Comissões.</p>
+      {section === "curso_questionarios" && cursoAtivo && (
+        <>
+          <div className="border-b border-slate-200 bg-white px-8 pt-4 space-y-0">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-slate-500 hover:text-slate-700 -ml-2 mb-2 flex items-center gap-1"
+              onClick={() => setSection("cursos")}
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Cursos e Turmas
+            </Button>
+            <div className="flex items-baseline gap-3 pb-1">
+              <h2 className="text-lg font-semibold text-slate-900">{cursoAtivo.nome}</h2>
+              <span className="text-sm text-slate-400">{cursoAtivo.codigo}</span>
+            </div>
+            <div className="flex gap-1 overflow-x-auto">
+              {(
+                [
+                  { key: "lista", label: "Questionários" },
+                  { key: "form", label: "Novo Questionário" },
+                  { key: "participacao", label: "Participação" },
+                  { key: "relatorios", label: "Relatórios" },
+                  { key: "evolucao", label: "Evolução por Curso" },
+                ] as { key: QuestionarioSub; label: string }[]
+              ).map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => { setQSub(key); if (key !== "form") setEditandoId(null); }}
+                  className={`px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
+                    qSub === key
+                      ? "border-emerald-500 text-emerald-600"
+                      : "border-transparent text-slate-500 hover:text-slate-700"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
-          <Card className="border-slate-200 shadow-sm bg-white">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base text-slate-900">Todos os Questionários</CardTitle>
-                <Badge variant="outline" className="text-xs text-slate-500">
-                  {questionarios.length} total
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {questionarios.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-40 text-slate-400 gap-2">
-                  <ClipboardList className="h-8 w-8" />
-                  <p className="text-sm font-medium">Nenhum questionário criado ainda.</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {questionarios.map((q) => {
-                    const { label, color } = STATUS_CONFIG[q.status];
-                    const totalRespostas = respostas.filter((r) => r.questionarioId === q.id).length;
-                    return (
-                      <div key={q.id} className="rounded-xl border border-slate-200 bg-white p-4 flex items-center gap-4">
-                        <div className="flex-1 min-w-0 space-y-0.5">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-medium text-sm text-slate-900 truncate">{q.titulo}</span>
-                            <Badge variant="outline" className={`text-xs shrink-0 ${color}`}>{label}</Badge>
-                          </div>
-                          <p className="text-xs text-slate-400">{q.dataInicio} → {q.dataFim}</p>
-                        </div>
-                        <span className="text-xs text-slate-500 shrink-0">{totalRespostas} resposta(s)</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+
+          {qSub === "lista" && (
+            <QuestionariosView
+              questionarios={questionariosDoCurso}
+              onNovo={() => { setEditandoId(null); setQSub("form"); }}
+              onEditar={(id) => { setEditandoId(id); setQSub("form"); }}
+              onEncerrar={encerrar}
+              onArquivar={arquivar}
+              onExcluir={excluir}
+            />
+          )}
+          {qSub === "form" && (
+            <QuestionarioForm
+              inicial={editandoId ? questionarios.find((q) => q.id === editandoId) : undefined}
+              cursosDisponiveis={cursoAtivo ? [{ id: cursoAtivo.id, nome: cursoAtivo.nome }] : []}
+              onRascunho={async (q: Questionario) => { await upsert(q); setEditandoId(null); setQSub("lista"); }}
+              onPublicar={async (q: Questionario) => { await upsert(q); setEditandoId(null); setQSub("lista"); }}
+              onCancelar={() => { setEditandoId(null); setQSub("lista"); }}
+            />
+          )}
+          {qSub === "participacao" && (
+            <ParticipacaoView questionarios={questionariosDoCurso} respostas={respostasDoCurso} />
+          )}
+          {qSub === "relatorios" && (
+            <RelatoriosView questionarios={questionariosDoCurso} respostas={respostasDoCurso} />
+          )}
+          {qSub === "evolucao" && <EvolucaoCursoView />}
+        </>
       )}
 
       {section === "logs" && <LogsView logs={logs} />}

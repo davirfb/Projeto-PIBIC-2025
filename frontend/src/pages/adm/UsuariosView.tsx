@@ -16,11 +16,12 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Plus, Pencil, Trash2, UserCheck, UserX } from "lucide-react";
-import type { UsuarioAdm } from "@/types/adm";
+import type { UsuarioAdm, Curso } from "@/types/adm";
 import type { UserRole, UserSubType } from "@/types/user";
 
 interface UsuariosViewProps {
   usuarios: UsuarioAdm[];
+  cursos: Curso[];
   onSalvar: (u: UsuarioAdm) => void;
   onExcluir: (id: string) => void;
   onToggleAtivo: (id: string) => void;
@@ -56,6 +57,8 @@ const SUBTIPO_OPCOES: { value: UserSubType; label: string }[] = [
   { value: "outro", label: "Outro" },
 ];
 
+const PERFIS_COM_CURSO: UserRole[] = ["comissao", "respondente", "padrao"];
+
 interface FormState {
   id: string | null;
   nome: string;
@@ -63,6 +66,7 @@ interface FormState {
   perfil: UserRole;
   subTipo: UserSubType | "";
   senha: string;
+  cursoIds: string[];
 }
 
 const FORM_VAZIO: FormState = {
@@ -72,9 +76,14 @@ const FORM_VAZIO: FormState = {
   perfil: "respondente",
   subTipo: "",
   senha: "",
+  cursoIds: [],
 };
 
-export function UsuariosView({ usuarios, onSalvar, onExcluir, onToggleAtivo }: UsuariosViewProps) {
+function toggleCurso(ids: string[], id: string): string[] {
+  return ids.includes(id) ? ids.filter((c) => c !== id) : [...ids, id];
+}
+
+export function UsuariosView({ usuarios, cursos, onSalvar, onExcluir, onToggleAtivo }: UsuariosViewProps) {
   const [form, setForm] = useState<FormState | null>(null);
   const [erros, setErros] = useState<Record<string, string>>({});
 
@@ -91,6 +100,7 @@ export function UsuariosView({ usuarios, onSalvar, onExcluir, onToggleAtivo }: U
       perfil: u.perfil,
       subTipo: u.subTipo ?? "",
       senha: "",
+      cursoIds: u.cursoIds,
     });
     setErros({});
   }
@@ -109,6 +119,9 @@ export function UsuariosView({ usuarios, onSalvar, onExcluir, onToggleAtivo }: U
       (u) => u.email === form.email.trim() && u.id !== form.id,
     );
     if (emailDuplicado) novosErros.email = "Este e-mail já está cadastrado.";
+    if (PERFIS_COM_CURSO.includes(form.perfil) && form.cursoIds.length === 0) {
+      novosErros.cursos = "Selecione ao menos um curso.";
+    }
     if (Object.keys(novosErros).length > 0) { setErros(novosErros); return; }
 
     const usuario: UsuarioAdm = {
@@ -117,6 +130,7 @@ export function UsuariosView({ usuarios, onSalvar, onExcluir, onToggleAtivo }: U
       email: form.email.trim(),
       perfil: form.perfil,
       subTipo: form.subTipo || undefined,
+      cursoIds: PERFIS_COM_CURSO.includes(form.perfil) ? form.cursoIds : [],
       ativo: true,
       criadoEm: form.id
         ? (usuarios.find((u) => u.id === form.id)?.criadoEm ?? new Date().toISOString())
@@ -125,6 +139,8 @@ export function UsuariosView({ usuarios, onSalvar, onExcluir, onToggleAtivo }: U
     onSalvar(usuario);
     fechar();
   }
+
+  const precisaCurso = form !== null && PERFIS_COM_CURSO.includes(form.perfil);
 
   return (
     <div className="p-8 space-y-6">
@@ -177,7 +193,9 @@ export function UsuariosView({ usuarios, onSalvar, onExcluir, onToggleAtivo }: U
                 <Label className="text-sm text-slate-600">Perfil *</Label>
                 <select
                   value={form.perfil}
-                  onChange={(e) => setForm((f) => f && ({ ...f, perfil: e.target.value as UserRole }))}
+                  onChange={(e) =>
+                    setForm((f) => f && ({ ...f, perfil: e.target.value as UserRole, cursoIds: [] }))
+                  }
                   className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 >
                   {PERFIL_OPCOES.map((o) => (
@@ -212,11 +230,52 @@ export function UsuariosView({ usuarios, onSalvar, onExcluir, onToggleAtivo }: U
               </div>
             </div>
 
+            {precisaCurso && (
+              <div className="mt-4 space-y-2">
+                <Label className="text-sm text-slate-600">
+                  {form.perfil === "comissao" ? "Cursos da Comissão *" : "Cursos Vinculados *"}
+                </Label>
+                <p className="text-xs text-slate-400">
+                  {form.perfil === "comissao"
+                    ? "Selecione os cursos que este membro irá comissionar."
+                    : "Selecione os cursos aos quais este usuário pertence."}
+                </p>
+                {cursos.length === 0 ? (
+                  <p className="text-xs text-amber-500">Nenhum curso cadastrado. Cadastre cursos primeiro.</p>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 rounded-lg border border-slate-200 p-3 bg-slate-50">
+                    {cursos.map((c) => {
+                      const selecionado = form.cursoIds.includes(c.id);
+                      return (
+                        <label
+                          key={c.id}
+                          className={`flex items-center gap-2 rounded-md border px-3 py-2 cursor-pointer text-sm transition-colors ${
+                            selecionado
+                              ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                              : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selecionado}
+                            onChange={() =>
+                              setForm((f) => f && ({ ...f, cursoIds: toggleCurso(f.cursoIds, c.id) }))
+                            }
+                            className="accent-emerald-500"
+                          />
+                          <span className="flex-1 truncate">{c.nome}</span>
+                          <span className="text-xs text-slate-400">{c.codigo}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+                {erros.cursos && <p className="text-xs text-red-500">{erros.cursos}</p>}
+              </div>
+            )}
+
             <div className="flex gap-3 mt-5">
-              <Button
-                onClick={handleSalvar}
-                className="bg-emerald-500 hover:bg-emerald-600 text-white"
-              >
+              <Button onClick={handleSalvar} className="bg-emerald-500 hover:bg-emerald-600 text-white">
                 Salvar
               </Button>
               <Button variant="outline" onClick={fechar} className="border-slate-200 text-slate-600">
@@ -245,6 +304,9 @@ export function UsuariosView({ usuarios, onSalvar, onExcluir, onToggleAtivo }: U
             <div className="space-y-2">
               {usuarios.map((u) => {
                 const { label, color } = PERFIL_CONFIG[u.perfil];
+                const cursosVinculados = u.cursoIds
+                  .map((id) => cursos.find((c) => c.id === id)?.nome)
+                  .filter(Boolean);
                 return (
                   <div
                     key={u.id}
@@ -262,6 +324,11 @@ export function UsuariosView({ usuarios, onSalvar, onExcluir, onToggleAtivo }: U
                         )}
                       </div>
                       <p className="text-xs text-slate-400">{u.email}</p>
+                      {cursosVinculados.length > 0 && (
+                        <p className="text-xs text-slate-400">
+                          Cursos: {cursosVinculados.join(", ")}
+                        </p>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-1.5 shrink-0">

@@ -49,14 +49,15 @@ export function HomeRespondente({ onLogout, userName, userId, userRole }: HomeRe
   const pendentes = vigentes.filter((q) => !jaRespondeu(userId, q.id));
   const respondidos = vigentes.filter((q) => jaRespondeu(userId, q.id));
 
-  const meuHistorico = respostas.filter((r) => r.respondentId === userId);
+  // respondentId nunca é exposto pela API (RN04); todos os respostas carregados são do usuário atual
+  const meuHistorico = respostas;
 
   const questionarioAtual = respondendoId
     ? vigentes.find((q) => q.id === respondendoId) ?? null
     : null;
 
-  function handleSubmit(r: Resposta) {
-    submeterResposta(r);
+  async function handleSubmit(r: Resposta) {
+    await submeterResposta(r);
     setRespondendoId(null);
     setSection("disponiveis");
   }

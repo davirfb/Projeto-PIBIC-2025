@@ -29,12 +29,18 @@ import type {
   LikertEscalaId,
 } from "@/types/questionario";
 import { LIKERT_ESCALAS } from "@/types/questionario";
-import { Plus, Trash2, FileText, ListChecks, BarChart2 } from "lucide-react";
+import { Plus, Trash2, FileText, ListChecks, BarChart2, GraduationCap } from "lucide-react";
+
+interface CursoOpcao {
+  id: string;
+  nome: string;
+}
 
 interface QuestionarioFormProps {
   inicial?: Questionario;
-  onRascunho: (q: Questionario) => void;
-  onPublicar: (q: Questionario) => void;
+  cursosDisponiveis?: CursoOpcao[];
+  onRascunho: (q: Questionario) => Promise<void>;
+  onPublicar: (q: Questionario) => Promise<void>;
   onCancelar: () => void;
 }
 
@@ -68,6 +74,8 @@ function validar(
   dataInicio: string,
   dataFim: string,
   questoes: Questao[],
+  cursosSelecionados: string[],
+  cursosDisponiveis: CursoOpcao[],
 ): Record<string, string> {
   const erros: Record<string, string> = {};
   if (!titulo.trim()) erros.titulo = "Título é obrigatório.";
@@ -75,6 +83,8 @@ function validar(
   if (!dataFim) erros.dataFim = "Data de encerramento é obrigatória.";
   if (dataInicio && dataFim && dataFim <= dataInicio)
     erros.dataFim = "Data de encerramento deve ser posterior à data de início.";
+  if (cursosDisponiveis.length > 0 && cursosSelecionados.length === 0)
+    erros.cursos = "Vincule ao menos um curso.";
   if (questoes.length === 0) erros.questoes = "Adicione ao menos uma questão.";
   questoes.forEach((q, i) => {
     if (!q.enunciado.trim())
@@ -113,6 +123,7 @@ const TIPO_CONFIG: Record<
 
 export function QuestionarioForm({
   inicial,
+  cursosDisponiveis = [],
   onRascunho,
   onPublicar,
   onCancelar,
@@ -123,8 +134,19 @@ export function QuestionarioForm({
   const [dataFim, setDataFim] = useState(inicial?.dataFim ?? "");
   const [anonimo, setAnonimo] = useState(inicial?.anonimo ?? true);
   const [questoes, setQuestoes] = useState<Questao[]>(inicial?.questoes ?? []);
+  const [cursosSelecionados, setCursosSelecionados] = useState<string[]>(
+    inicial?.cursos ?? cursosDisponiveis.map((c) => c.id),
+  );
   const [erros, setErros] = useState<Record<string, string>>({});
   const [showConfirmPublicar, setShowConfirmPublicar] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  function toggleCurso(id: string) {
+    setCursosSelecionados((prev) =>
+      prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id],
+    );
+  }
 
   function montar(status: "rascunho" | "publicado"): Questionario {
     return {
@@ -136,23 +158,31 @@ export function QuestionarioForm({
       anonimo,
       status,
       questoes,
-      cursos: inicial?.cursos ?? [],
+      cursos: cursosSelecionados,
       criadoEm: inicial?.criadoEm ?? new Date().toISOString(),
       atualizadoEm: new Date().toISOString(),
     };
   }
 
-  function handleRascunho() {
+  async function handleRascunho() {
     if (!titulo.trim()) {
       setErros({ titulo: "Título é obrigatório mesmo para rascunho." });
       return;
     }
     setErros({});
-    onRascunho(montar("rascunho"));
+    setSaveError(null);
+    setSaving(true);
+    try {
+      await onRascunho(montar("rascunho"));
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Erro ao salvar.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   function handlePublicarClick() {
-    const novosErros = validar(titulo, dataInicio, dataFim, questoes);
+    const novosErros = validar(titulo, dataInicio, dataFim, questoes, cursosSelecionados, cursosDisponiveis);
     if (Object.keys(novosErros).length > 0) {
       setErros(novosErros);
       return;
@@ -328,6 +358,51 @@ export function QuestionarioForm({
               </p>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Cursos Vinculados — RF09 */}
+      <Card className="border-slate-200 shadow-sm bg-white">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <GraduationCap className="h-4 w-4 text-slate-500" />
+            <CardTitle className="text-base text-slate-900">Cursos Vinculados</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {cursosDisponiveis.length === 0 ? (
+            <p className="text-sm text-slate-400 italic">
+              Nenhum curso disponível para vincular. O administrador deve cadastrar cursos primeiro.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {cursosDisponiveis.map((curso) => {
+                const selecionado = cursosSelecionados.includes(curso.id);
+                return (
+                  <label
+                    key={curso.id}
+                    className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 cursor-pointer hover:bg-slate-100 transition-colors"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selecionado}
+                      onChange={() => toggleCurso(curso.id)}
+                      className="h-4 w-4 rounded border-slate-300 text-emerald-600"
+                    />
+                    <span className="text-sm text-slate-800">{curso.nome}</span>
+                    {selecionado && (
+                      <Badge className="ml-auto text-xs bg-emerald-50 text-emerald-700 border-emerald-200" variant="outline">
+                        Selecionado
+                      </Badge>
+                    )}
+                  </label>
+                );
+              })}
+              {erros.cursos && (
+                <p className="text-xs text-red-500 mt-1">{erros.cursos}</p>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -542,10 +617,14 @@ export function QuestionarioForm({
       </Card>
 
       {/* Ações */}
+      {saveError && (
+        <p className="text-sm text-red-500 text-right pb-2">{saveError}</p>
+      )}
       <div className="flex items-center justify-between pb-8">
         <Button
           variant="outline"
           onClick={onCancelar}
+          disabled={saving}
           className="border-slate-300 text-slate-600"
         >
           Cancelar
@@ -554,15 +633,17 @@ export function QuestionarioForm({
           <Button
             variant="outline"
             onClick={handleRascunho}
+            disabled={saving}
             className="border-slate-300 text-slate-700 hover:bg-slate-100"
           >
-            Salvar Rascunho
+            {saving ? "Salvando…" : "Salvar Rascunho"}
           </Button>
           <Button
             onClick={handlePublicarClick}
+            disabled={saving}
             className="bg-emerald-500 hover:bg-emerald-600 text-white"
           >
-            Publicar
+            {saving ? "Publicando…" : "Publicar"}
           </Button>
         </div>
       </div>
@@ -585,7 +666,17 @@ export function QuestionarioForm({
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               className="bg-emerald-500 hover:bg-emerald-600 text-white"
-              onClick={() => onPublicar(montar("publicado"))}
+              onClick={async () => {
+                setSaveError(null);
+                setSaving(true);
+                try {
+                  await onPublicar(montar("publicado"));
+                } catch (err) {
+                  setSaveError(err instanceof Error ? err.message : "Erro ao publicar.");
+                } finally {
+                  setSaving(false);
+                }
+              }}
             >
               Sim, publicar
             </AlertDialogAction>

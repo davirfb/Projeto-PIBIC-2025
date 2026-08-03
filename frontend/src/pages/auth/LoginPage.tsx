@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { Mail, Lock, Eye } from "lucide-react";
+import { Mail, Lock, Eye, Loader2 } from "lucide-react";
 import logoIFB2 from "@/assets/logoIFB-home.svg";
 import {
   Card,
@@ -13,57 +13,39 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import type { UserRole, UserSubType } from "@/types/user";
-
-export interface LoginUser {
-  role: UserRole;
-  email: string;
-  name: string;
-  subType?: UserSubType;
-}
+import { api } from "@/services/api";
+import type { AuthUser } from "@/hooks/useAuth";
 
 interface LoginPageProps {
-  onLogin?: (user: LoginUser) => void;
+  onLogin?: (token: string, user: AuthUser) => void;
 }
-
-const MOCK_CREDENTIALS: Record<string, { role: UserRole; label: string }> = {
-  "adm@ifb.edu.br": { role: "adm", label: "ADM" },
-  "comissao@ifb.edu.br": { role: "comissao", label: "Comissão" },
-  "respondente@ifb.edu.br": { role: "respondente", label: "Respondente" },
-  "padrao@ifb.edu.br": { role: "padrao", label: "Padrão" },
-};
 
 export function LoginPage({ onLogin }: LoginPageProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  function getNameFromEmail(normalizedEmail: string): string {
-    const [localPart = ""] = normalizedEmail.split("@");
-    if (!localPart) return "Usuário IFB";
-    return localPart
-      .split(".")
-      .filter(Boolean)
-      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-      .join(" ");
-  }
-
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const normalizedEmail = email.trim().toLowerCase();
-    const credential = MOCK_CREDENTIALS[normalizedEmail];
-
-    if (credential) {
-      onLogin?.({
-        role: credential.role,
-        email: normalizedEmail,
-        name: getNameFromEmail(normalizedEmail),
+    setError("");
+    setLoading(true);
+    try {
+      const data = await api.login(email.trim().toLowerCase(), password);
+      onLogin?.(data.access_token, {
+        id: data.user.id,
+        email: data.user.email,
+        name: data.user.nome,
+        role: data.user.role,
+        subType: data.user.sub_type ?? undefined,
       });
-      setError("");
-      return;
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Erro ao conectar com o servidor."
+      );
+    } finally {
+      setLoading(false);
     }
-
-    setError("Credenciais inválidas. Verifique seu e-mail e tente novamente.");
   }
 
   return (
@@ -90,7 +72,6 @@ export function LoginPage({ onLogin }: LoginPageProps) {
               semestre.
             </p>
           </div>
-
         </div>
 
         {/* Coluna direita: card de login */}
@@ -121,6 +102,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                     className="pl-9 bg-slate-50 border-slate-200 focus-visible:bg-white"
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
+                    disabled={loading}
                   />
                 </div>
               </div>
@@ -139,6 +121,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                     className="pl-9 pr-9 bg-slate-50 border-slate-200 focus-visible:bg-white"
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
+                    disabled={loading}
                   />
                   <button
                     type="button"
@@ -156,9 +139,17 @@ export function LoginPage({ onLogin }: LoginPageProps) {
             <CardFooter className="flex flex-col gap-4 pt-2">
               <Button
                 type="submit"
+                disabled={loading}
                 className="w-full h-11 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold"
               >
-                Entrar
+                {loading ? (
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Entrando...
+                  </span>
+                ) : (
+                  "Entrar"
+                )}
               </Button>
               <p className="text-xs text-slate-500 text-center">
                 Problemas de acesso? Contate a secretaria acadêmica.

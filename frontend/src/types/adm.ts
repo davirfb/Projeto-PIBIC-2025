@@ -6,6 +6,7 @@ export interface UsuarioAdm {
   email: string
   perfil: UserRole
   subTipo?: UserSubType
+  cursoIds: string[]
   ativo: boolean
   criadoEm: string
 }
@@ -14,7 +15,7 @@ export interface Turma {
   id: string
   nome: string
   ano: number
-  semestre: 1 | 2
+  semestre: number
 }
 
 export interface Curso {

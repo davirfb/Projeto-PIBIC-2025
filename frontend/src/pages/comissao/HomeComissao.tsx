@@ -198,7 +198,7 @@ interface QuestionariosViewProps {
   onExcluir: (id: string) => void;
 }
 
-function QuestionariosView({
+export function QuestionariosView({
   questionarios,
   onNovo,
   onEditar,
@@ -321,6 +321,10 @@ function QuestionariosView({
   );
 }
 
+const CURSOS_COMISSAO_MOCK = [
+  { id: "tsi-001", nome: "Tecnologia em Sistemas para Internet (TSI)" },
+];
+
 export function HomeComissao({ onLogout, userName }: HomeComissaoProps) {
   const [section, setSection] = useState<Section>("questionarios");
   const [editandoId, setEditandoId] = useState<string | null>(null);
@@ -331,14 +335,14 @@ export function HomeComissao({ onLogout, userName }: HomeComissaoProps) {
     ? questionarios.find((q) => q.id === editandoId)
     : undefined;
 
-  function handleSalvarRascunho(q: Questionario) {
-    upsert(q);
+  async function handleSalvarRascunho(q: Questionario) {
+    await upsert(q);
     setEditandoId(null);
     setSection("questionarios");
   }
 
-  function handlePublicar(q: Questionario) {
-    upsert(q);
+  async function handlePublicar(q: Questionario) {
+    await upsert(q);
     setEditandoId(null);
     setSection("questionarios");
   }
@@ -425,6 +429,7 @@ export function HomeComissao({ onLogout, userName }: HomeComissaoProps) {
       {section === "form" && (
         <QuestionarioForm
           inicial={questionarioEditando}
+          cursosDisponiveis={CURSOS_COMISSAO_MOCK}
           onRascunho={handleSalvarRascunho}
           onPublicar={handlePublicar}
           onCancelar={handleCancelar}

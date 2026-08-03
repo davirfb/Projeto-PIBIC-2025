@@ -26,8 +26,8 @@ export function HomePadrao({ onLogout, userName, userId, userRole }: HomePadraoP
     ? vigentes.find((q) => q.id === respondendoId) ?? null
     : null;
 
-  function handleSubmit(r: Resposta) {
-    submeterResposta(r);
+  async function handleSubmit(r: Resposta) {
+    await submeterResposta(r);
     setRespondendoId(null);
   }
 
