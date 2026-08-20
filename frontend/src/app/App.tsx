@@ -7,7 +7,7 @@ import { HomePadrao } from "@/pages/padrao/HomePadrao";
 import { QuestionarioProvider } from "@/context/QuestionarioContext";
 
 function App() {
-  const { user, isAuthenticated, isLoading, login, logout } = useAuth();
+  const { user, isAuthenticated, isLoading, logout } = useAuth();
 
   if (isLoading) {
     return (
@@ -18,18 +18,40 @@ function App() {
   }
 
   if (!isAuthenticated || !user) {
-    return <LoginPage onLogin={login} />;
+    return <LoginPage />;
   }
 
+  const hasComissao = user.comissoes.length > 0;
+
   return (
-    <QuestionarioProvider userRole={user.role}>
-      {user.role === "adm" && <HomeADM onLogout={logout} userName={user.name} />}
-      {user.role === "comissao" && <HomeComissao onLogout={logout} userName={user.name} />}
-      {user.role === "respondente" && (
-        <HomeRespondente onLogout={logout} userName={user.name} userId={user.id} userRole={user.role} />
+    <QuestionarioProvider
+      isAdm={user.isAdm}
+      hasComissao={hasComissao}
+      comissaoId={user.comissoes[0]?.id}
+      userId={user.id}
+      userTipo={user.tipo}
+    >
+      {user.isAdm && (
+        <HomeADM onLogout={logout} userName={user.nome} />
       )}
-      {user.role === "padrao" && (
-        <HomePadrao onLogout={logout} userName={user.name} userId={user.id} userRole={user.role} />
+      {!user.isAdm && hasComissao && (
+        <HomeComissao onLogout={logout} userName={user.nome} />
+      )}
+      {!user.isAdm && !hasComissao && user.nivelAcesso === "respondente" && (
+        <HomeRespondente
+          onLogout={logout}
+          userName={user.nome}
+          userId={user.id}
+          userTipo={user.tipo}
+        />
+      )}
+      {!user.isAdm && !hasComissao && user.nivelAcesso === "padrao" && (
+        <HomePadrao
+          onLogout={logout}
+          userName={user.nome}
+          userId={user.id}
+          userTipo={user.tipo}
+        />
       )}
     </QuestionarioProvider>
   );

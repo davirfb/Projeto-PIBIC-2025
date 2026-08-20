@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "@/services/api";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,7 +25,7 @@ import { ParticipacaoView } from "@/pages/comissao/ParticipacaoView";
 import { RelatoriosView } from "@/pages/comissao/RelatoriosView";
 import { EvolucaoCursoView } from "@/pages/comissao/EvolucaoCursoView";
 import type { UsuarioAdm, Curso, Turma, LogEntry, Configuracoes } from "@/types/adm";
-import type { UserRole } from "@/types/user";
+import type { UserTipo, NivelAcesso } from "@/types/user";
 import type { Questionario } from "@/types/questionario";
 
 type Section = "dashboard" | "usuarios" | "cursos" | "curso_questionarios" | "logs" | "configuracoes";
@@ -46,6 +47,32 @@ function gerarId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+function fromDbUsuario(raw: Record<string, unknown>): UsuarioAdm {
+  const cursoIds = (raw.usuario_cursos as { curso_id: string }[] ?? []).map((uc) => uc.curso_id);
+  const admRows = raw.adm_sistema as { usuario_id: string }[] | null;
+  return {
+    id: raw.id as string,
+    nome: raw.nome as string,
+    email: raw.email as string,
+    tipo: raw.tipo as UserTipo,
+    nivelAcesso: raw.nivel_acesso as NivelAcesso,
+    isAdm: Array.isArray(admRows) && admRows.length > 0,
+    matricula: (raw.matricula as string) ?? undefined,
+    cursoIds,
+    ativo: raw.ativo as boolean,
+    criadoEm: String(raw.criado_em),
+  };
+}
+
+function fromDbCurso(raw: Record<string, unknown>): Curso {
+  return {
+    id: raw.id as string,
+    nome: raw.nome as string,
+    codigo: raw.codigo as string,
+    turmas: [],
+  };
+}
+
 export function HomeADM({ onLogout, userName }: HomeADMProps) {
   const [section, setSection] = useState<Section>("dashboard");
   const [usuarios, setUsuarios] = useState<UsuarioAdm[]>([]);
@@ -55,60 +82,176 @@ export function HomeADM({ onLogout, userName }: HomeADMProps) {
   const [cursoAtivo, setCursoAtivo] = useState<Curso | null>(null);
   const [qSub, setQSub] = useState<QuestionarioSub>("lista");
   const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [apiError, setApiError] = useState<string | null>(null);
 
   const { questionarios, respostas, upsert, encerrar, arquivar, excluir } = useQuestionario();
 
-  function registrarLog(acao: string, perfil: UserRole = "adm") {
+  useEffect(() => {
+    supabase
+      .from("usuarios")
+      .select("*, usuario_cursos(curso_id), adm_sistema(usuario_id)")
+      .then(({ data }) => {
+        if (data) setUsuarios((data as Record<string, unknown>[]).map(fromDbUsuario));
+      });
+    supabase
+      .from("cursos")
+      .select("*")
+      .then(({ data }) => {
+        if (data) setCursos((data as Record<string, unknown>[]).map(fromDbCurso));
+      });
+  }, []);
+
+  function registrarLog(acao: string) {
     const entry: LogEntry = {
       id: gerarId(),
       acao,
       usuario: userName ?? "Administrador",
-      perfil,
       timestamp: new Date().toISOString(),
     };
     setLogs((prev) => [...prev, entry]);
   }
 
-  function handleSalvarUsuario(u: UsuarioAdm) {
-    setUsuarios((prev) => {
-      const existe = prev.some((p) => p.id === u.id);
-      return existe ? prev.map((p) => (p.id === u.id ? u : p)) : [...prev, u];
-    });
-    const acao = usuarios.some((p) => p.id === u.id)
-      ? `Usuário editado: ${u.nome} (${u.email})`
-      : `Usuário criado: ${u.nome} (${u.email})`;
-    registrarLog(acao);
+  async function handleSalvarUsuario(u: UsuarioAdm, senha: string) {
+    const existe = usuarios.some((p) => p.id === u.id);
+    try {
+      if (existe) {
+        const { error } = await supabase
+          .from("usuarios")
+          .update({
+            nome: u.nome,
+            tipo: u.tipo,
+            nivel_acesso: u.nivelAcesso,
+            ativo: u.ativo,
+          })
+          .eq("id", u.id);
+        if (error) throw error;
+
+        // Sincroniza cursos
+        await supabase.from("usuario_cursos").delete().eq("usuario_id", u.id);
+        if (u.cursoIds.length > 0) {
+          await supabase.from("usuario_cursos").insert(
+            u.cursoIds.map((cid) => ({ usuario_id: u.id, curso_id: cid })),
+          );
+        }
+
+        // Sincroniza status de ADM
+        if (u.isAdm) {
+          await supabase.from("adm_sistema").upsert({ usuario_id: u.id });
+        } else {
+          await supabase.from("adm_sistema").delete().eq("usuario_id", u.id);
+        }
+
+        const saved = fromDbUsuario({
+          ...u,
+          nivel_acesso: u.nivelAcesso,
+          usuario_cursos: u.cursoIds.map((cid) => ({ curso_id: cid })),
+          adm_sistema: u.isAdm ? [{ usuario_id: u.id }] : [],
+          criado_em: u.criadoEm,
+        });
+        setUsuarios((prev) => prev.map((p) => (p.id === u.id ? saved : p)));
+        registrarLog(`Usuário editado: ${saved.nome} (${saved.email})`);
+      } else {
+        const { data, error } = await supabase.functions.invoke("create-user", {
+          body: {
+            nome: u.nome,
+            email: u.email,
+            senha,
+            tipo: u.tipo,
+            nivel_acesso: u.nivelAcesso,
+            is_adm: u.isAdm,
+            curso_ids: u.cursoIds,
+            matricula: u.tipo === "aluno" ? u.matricula : undefined,
+          },
+        });
+        if (error) throw error;
+        const raw = data as Record<string, unknown>;
+        const saved = fromDbUsuario({
+          ...raw,
+          usuario_cursos: u.cursoIds.map((cid) => ({ curso_id: cid })),
+          adm_sistema: u.isAdm ? [{ usuario_id: raw.id }] : [],
+        });
+        setUsuarios((prev) => [...prev, saved]);
+        registrarLog(`Usuário criado: ${saved.nome} (${saved.email})`);
+      }
+    } catch (err) {
+      setApiError(err instanceof Error ? err.message : "Erro ao salvar usuário.");
+    }
   }
 
-  function handleExcluirUsuario(id: string) {
+  async function handleExcluirUsuario(id: string) {
     const u = usuarios.find((u) => u.id === id);
-    setUsuarios((prev) => prev.filter((u) => u.id !== id));
-    if (u) registrarLog(`Usuário excluído: ${u.nome} (${u.email})`);
+    try {
+      const { error } = await supabase.functions.invoke("delete-user", {
+        body: { userId: id },
+      });
+      if (error) throw error;
+      setUsuarios((prev) => prev.filter((u) => u.id !== id));
+      if (u) registrarLog(`Usuário excluído: ${u.nome} (${u.email})`);
+    } catch (err) {
+      setApiError(err instanceof Error ? err.message : "Erro ao excluir usuário.");
+    }
   }
 
-  function handleToggleAtivo(id: string) {
+  async function handleToggleAtivo(id: string) {
     const u = usuarios.find((u) => u.id === id);
-    setUsuarios((prev) =>
-      prev.map((u) => (u.id === id ? { ...u, ativo: !u.ativo } : u)),
-    );
-    if (u) registrarLog(`Usuário ${u.ativo ? "desativado" : "ativado"}: ${u.nome}`);
+    if (!u) return;
+    try {
+      const { error } = await supabase
+        .from("usuarios")
+        .update({ ativo: !u.ativo })
+        .eq("id", id);
+      if (error) throw error;
+      setUsuarios((prev) =>
+        prev.map((p) => (p.id === id ? { ...p, ativo: !u.ativo } : p)),
+      );
+      registrarLog(`Usuário ${u.ativo ? "desativado" : "ativado"}: ${u.nome}`);
+    } catch (err) {
+      setApiError(err instanceof Error ? err.message : "Erro ao alterar status do usuário.");
+    }
   }
 
-  function handleSalvarCurso(c: Curso) {
-    setCursos((prev) => {
-      const existe = prev.some((p) => p.id === c.id);
-      return existe ? prev.map((p) => (p.id === c.id ? c : p)) : [...prev, c];
-    });
-    const acao = cursos.some((p) => p.id === c.id)
-      ? `Curso editado: ${c.nome} (${c.codigo})`
-      : `Curso criado: ${c.nome} (${c.codigo})`;
-    registrarLog(acao);
+  async function handleSalvarCurso(c: Curso) {
+    const existe = cursos.some((p) => p.id === c.id);
+    try {
+      if (existe) {
+        const { data, error } = await supabase
+          .from("cursos")
+          .update({ nome: c.nome })
+          .eq("id", c.id)
+          .select("*")
+          .single();
+        if (error) throw error;
+        const saved = fromDbCurso(data as Record<string, unknown>);
+        setCursos((prev) =>
+          prev.map((p) => (p.id === c.id ? { ...saved, turmas: p.turmas } : p)),
+        );
+        registrarLog(`Curso editado: ${saved.nome} (${saved.codigo})`);
+      } else {
+        const { data, error } = await supabase
+          .from("cursos")
+          .insert({ nome: c.nome, codigo: c.codigo })
+          .select("*")
+          .single();
+        if (error) throw error;
+        const saved = fromDbCurso(data as Record<string, unknown>);
+        setCursos((prev) => [...prev, saved]);
+        registrarLog(`Curso criado: ${saved.nome} (${saved.codigo})`);
+      }
+    } catch (err) {
+      setApiError(err instanceof Error ? err.message : "Erro ao salvar curso.");
+    }
   }
 
-  function handleExcluirCurso(id: string) {
+  async function handleExcluirCurso(id: string) {
     const c = cursos.find((c) => c.id === id);
-    setCursos((prev) => prev.filter((c) => c.id !== id));
-    if (c) registrarLog(`Curso excluído: ${c.nome}`);
+    try {
+      const { error } = await supabase.from("cursos").delete().eq("id", id);
+      if (error) throw error;
+      setCursos((prev) => prev.filter((c) => c.id !== id));
+      if (c) registrarLog(`Curso excluído: ${c.nome}`);
+    } catch (err) {
+      setApiError(err instanceof Error ? err.message : "Erro ao excluir curso.");
+    }
   }
 
   function handleSalvarTurma(cursoId: string, t: Turma) {
@@ -210,6 +353,19 @@ export function HomeADM({ onLogout, userName }: HomeADMProps) {
       userRoleLabel="Administrador"
       navSections={navSections}
     >
+      {apiError && (
+        <div className="mx-8 mt-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600 flex items-center justify-between">
+          <span>{apiError}</span>
+          <button
+            type="button"
+            className="text-red-400 hover:text-red-600 font-medium ml-4"
+            onClick={() => setApiError(null)}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {section === "dashboard" && (
         <div className="p-8 space-y-8">
           <div>
@@ -274,17 +430,17 @@ export function HomeADM({ onLogout, userName }: HomeADMProps) {
         <UsuariosView
           usuarios={usuarios}
           cursos={cursos}
-          onSalvar={handleSalvarUsuario}
-          onExcluir={handleExcluirUsuario}
-          onToggleAtivo={handleToggleAtivo}
+          onSalvar={(u, senha) => { void handleSalvarUsuario(u, senha); }}
+          onExcluir={(id) => { void handleExcluirUsuario(id); }}
+          onToggleAtivo={(id) => { void handleToggleAtivo(id); }}
         />
       )}
 
       {section === "cursos" && (
         <CursosView
           cursos={cursos}
-          onSalvarCurso={handleSalvarCurso}
-          onExcluirCurso={handleExcluirCurso}
+          onSalvarCurso={(c) => { void handleSalvarCurso(c); }}
+          onExcluirCurso={(id) => { void handleExcluirCurso(id); }}
           onSalvarTurma={handleSalvarTurma}
           onExcluirTurma={handleExcluirTurma}
           onAbrirQuestionarios={handleAbrirQuestionarios}

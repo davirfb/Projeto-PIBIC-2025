@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { Mail, Lock, Eye, Loader2 } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
 import logoIFB2 from "@/assets/logoIFB-home.svg";
 import {
   Card,
@@ -13,16 +13,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { api } from "@/services/api";
-import type { AuthUser } from "@/hooks/useAuth";
+import { supabase } from "@/services/api";
 
-interface LoginPageProps {
-  onLogin?: (token: string, user: AuthUser) => void;
-}
-
-export function LoginPage({ onLogin }: LoginPageProps) {
+export function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -31,17 +27,15 @@ export function LoginPage({ onLogin }: LoginPageProps) {
     setError("");
     setLoading(true);
     try {
-      const data = await api.login(email.trim().toLowerCase(), password);
-      onLogin?.(data.access_token, {
-        id: data.user.id,
-        email: data.user.email,
-        name: data.user.nome,
-        role: data.user.role,
-        subType: data.user.sub_type ?? undefined,
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password,
       });
+      if (authError) throw authError;
+      // useAuth detecta SIGNED_IN via onAuthStateChange
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Erro ao conectar com o servidor."
+        err instanceof Error ? err.message : "Credenciais inválidas."
       );
     } finally {
       setLoading(false);
@@ -117,7 +111,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                   </span>
                   <Input
                     id="password"
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     className="pl-9 pr-9 bg-slate-50 border-slate-200 focus-visible:bg-white"
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
@@ -126,9 +120,10 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                   <button
                     type="button"
                     className="absolute inset-y-0 right-3 flex items-center text-slate-400 hover:text-slate-600"
-                    aria-label="Mostrar senha"
+                    aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                    onClick={() => setShowPassword((v) => !v)}
                   >
-                    <Eye className="h-4 w-4" />
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
               </div>

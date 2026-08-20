@@ -3,18 +3,19 @@ import { Badge } from "@/components/ui/badge";
 import { BarChart3, ClipboardCheck, ClipboardList, MessageSquare } from "lucide-react";
 import type { Questionario } from "@/types/questionario";
 import type { Resposta } from "@/types/resposta";
-import type { UserRole } from "@/types/user";
+import type { UserTipo } from "@/types/user";
 
 interface ParticipacaoViewProps {
   questionarios: Questionario[];
   respostas: Resposta[];
 }
 
-const ROLE_LABEL: Record<UserRole, string> = {
-  adm: "Administrador",
-  comissao: "Comissão",
-  respondente: "Respondente",
-  padrao: "Padrão",
+const TIPO_LABEL: Record<UserTipo, string> = {
+  aluno: "Aluno",
+  professor: "Professor",
+  coordenador: "Coordenador",
+  tecnico_administrativo: "Técnico-Administrativo",
+  outro: "Outro",
 };
 
 const STATUS_CONFIG = {
@@ -42,12 +43,12 @@ export function ParticipacaoView({ questionarios, respostas }: ParticipacaoViewP
   );
   const totalRespostas = respostas.length;
 
-  const porRole = (["respondente", "padrao", "comissao", "adm"] as UserRole[]).map((role) => {
-    const count = respostas.filter((r) => r.respondentRole === role).length;
-    return { role, count };
+  const porTipo = (["aluno", "professor", "coordenador", "tecnico_administrativo", "outro"] as UserTipo[]).map((tipo) => {
+    const count = respostas.filter((r) => r.respondentTipo === tipo).length;
+    return { tipo, count };
   }).filter((r) => r.count > 0);
 
-  const maxRole = Math.max(...porRole.map((r) => r.count), 1);
+  const maxRole = Math.max(...porTipo.map((r) => r.count), 1);
 
   const questionariosComRespostas = questionarios
     .filter((q) => q.status !== "rascunho")
@@ -144,14 +145,14 @@ export function ParticipacaoView({ questionarios, respostas }: ParticipacaoViewP
             </div>
           </CardHeader>
           <CardContent>
-            {porRole.length === 0 ? (
+            {porTipo.length === 0 ? (
               <p className="text-sm text-slate-400 text-center py-6">Nenhuma resposta coletada ainda.</p>
             ) : (
               <div className="space-y-4">
-                {porRole.map(({ role, count }) => (
-                  <div key={role} className="space-y-1.5">
+                {porTipo.map(({ tipo, count }) => (
+                  <div key={tipo} className="space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-slate-700">{ROLE_LABEL[role]}</span>
+                      <span className="text-sm text-slate-700">{TIPO_LABEL[tipo]}</span>
                       <span className="text-sm font-semibold text-slate-900">
                         {count} ({Math.round((count / totalRespostas) * 100)}%)
                       </span>

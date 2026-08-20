@@ -7,16 +7,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useQuestionario } from "@/context/QuestionarioContext";
 import { ResponderView } from "@/pages/respondente/ResponderView";
 import type { Resposta } from "@/types/resposta";
-import type { UserRole } from "@/types/user";
+import type { UserTipo } from "@/types/user";
 
 interface HomePadraoProps {
   onLogout?: () => void;
   userName?: string;
   userId: string;
-  userRole: UserRole;
+  userTipo: UserTipo;
 }
 
-export function HomePadrao({ onLogout, userName, userId, userRole }: HomePadraoProps) {
+export function HomePadrao({ onLogout, userName, userId, userTipo }: HomePadraoProps) {
   const [respondendoId, setRespondendoId] = useState<string | null>(null);
 
   const { getQuestionariosVigentes, jaRespondeu, submeterResposta } = useQuestionario();
@@ -57,7 +57,7 @@ export function HomePadrao({ onLogout, userName, userId, userRole }: HomePadraoP
           <ResponderView
             questionario={questionarioAtual}
             respondentId={questionarioAtual.anonimo ? null : userId}
-            respondentRole={userRole}
+            respondentTipo={userTipo}
             onSubmit={handleSubmit}
             onCancelar={() => setRespondendoId(null)}
           />

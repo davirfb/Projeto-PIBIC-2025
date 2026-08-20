@@ -15,7 +15,7 @@ import {
 import { useQuestionario } from "@/context/QuestionarioContext";
 import { ResponderView } from "./ResponderView";
 import type { Resposta } from "@/types/resposta";
-import type { UserRole } from "@/types/user";
+import type { UserTipo } from "@/types/user";
 
 type Section = "disponiveis" | "respondendo" | "historico" | "notificacoes" | "perfil";
 
@@ -23,7 +23,7 @@ interface HomeRespondentProps {
   onLogout?: () => void;
   userName?: string;
   userId: string;
-  userRole: UserRole;
+  userTipo: UserTipo;
 }
 
 function PendingSection({ title, description }: { title: string; description: string }) {
@@ -39,11 +39,11 @@ function PendingSection({ title, description }: { title: string; description: st
   );
 }
 
-export function HomeRespondente({ onLogout, userName, userId, userRole }: HomeRespondentProps) {
+export function HomeRespondente({ onLogout, userName, userId, userTipo }: HomeRespondentProps) {
   const [section, setSection] = useState<Section>("disponiveis");
   const [respondendoId, setRespondendoId] = useState<string | null>(null);
 
-  const { getQuestionariosVigentes, jaRespondeu, submeterResposta, respostas } = useQuestionario();
+  const { questionarios, getQuestionariosVigentes, jaRespondeu, submeterResposta, respostas } = useQuestionario();
 
   const vigentes = getQuestionariosVigentes();
   const pendentes = vigentes.filter((q) => !jaRespondeu(userId, q.id));
@@ -232,7 +232,7 @@ export function HomeRespondente({ onLogout, userName, userId, userRole }: HomeRe
         <ResponderView
           questionario={questionarioAtual}
           respondentId={questionarioAtual.anonimo ? null : userId}
-          respondentRole={userRole}
+          respondentTipo={userTipo}
           onSubmit={handleSubmit}
           onCancelar={() => {
             setRespondendoId(null);
@@ -255,7 +255,7 @@ export function HomeRespondente({ onLogout, userName, userId, userRole }: HomeRe
           ) : (
             <div className="space-y-3">
               {meuHistorico.map((r) => {
-                const q = vigentes.find((q) => q.id === r.questionarioId);
+                const q = questionarios.find((q) => q.id === r.questionarioId);
                 return (
                   <div key={r.id} className="rounded-xl border border-slate-200 bg-white p-4 flex items-center justify-between gap-4">
                     <div>

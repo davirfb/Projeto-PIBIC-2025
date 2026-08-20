@@ -24,7 +24,7 @@ export function AppLayout({
         userRoleLabel={userRoleLabel}
         navSections={navSections}
       />
-      <main className="flex-1 overflow-y-auto" aria-label="Conteudo principal">
+      <main className="flex-1 overflow-y-auto" aria-label="Conteúdo principal">
         {children}
       </main>
     </div>

@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { FileText, CalendarDays, MessageSquare } from "lucide-react";
 import type { Questionario, QuestionarioStatus } from "@/types/questionario";
 import type { Resposta } from "@/types/resposta";
-import type { UserRole } from "@/types/user";
+import type { UserTipo } from "@/types/user";
 import { RelatorioDetalhe } from "./RelatorioDetalhe";
 
 interface RelatoriosViewProps {
@@ -20,17 +20,18 @@ const STATUS_CONFIG: Record<QuestionarioStatus, { label: string; color: string }
   arquivado: { label: "Arquivado", color: "bg-amber-50 text-amber-700 border-amber-200" },
 };
 
-const ROLE_LABEL: Record<UserRole, string> = {
-  adm: "Administrador",
-  comissao: "Comissão",
-  respondente: "Respondente",
-  padrao: "Padrão",
+const TIPO_LABEL: Record<UserTipo, string> = {
+  aluno: "Aluno",
+  professor: "Professor",
+  coordenador: "Coordenador",
+  tecnico_administrativo: "Técnico-Administrativo",
+  outro: "Outro",
 };
 
 export function RelatoriosView({ questionarios, respostas }: RelatoriosViewProps) {
   const [selecionadoId, setSelecionadoId] = useState<string | null>(null);
   const [filtroPeriodo, setFiltroPeriodo] = useState("todos");
-  const [filtroRole, setFiltroRole] = useState("todos");
+  const [filtroTipo, setFiltroTipo] = useState("todos");
 
   const encerrados = questionarios.filter(
     (q) => q.status === "encerrado" || q.status === "arquivado",
@@ -38,16 +39,16 @@ export function RelatoriosView({ questionarios, respostas }: RelatoriosViewProps
 
   const anos = [...new Set(encerrados.map((q) => q.dataFim.slice(0, 4)))].sort().reverse();
 
-  const rolesPresentes = [
-    ...new Set(respostas.map((r) => r.respondentRole)),
-  ] as UserRole[];
+  const tiposPresentes = [
+    ...new Set(respostas.map((r) => r.respondentTipo)),
+  ] as UserTipo[];
 
   const filtrados = encerrados.filter((q) => {
     const passaPeriodo = filtroPeriodo === "todos" || q.dataFim.startsWith(filtroPeriodo);
-    const passaRole =
-      filtroRole === "todos" ||
-      respostas.some((r) => r.questionarioId === q.id && r.respondentRole === filtroRole);
-    return passaPeriodo && passaRole;
+    const passaTipo =
+      filtroTipo === "todos" ||
+      respostas.some((r) => r.questionarioId === q.id && r.respondentTipo === filtroTipo);
+    return passaPeriodo && passaTipo;
   });
 
   if (selecionadoId) {
@@ -95,22 +96,22 @@ export function RelatoriosView({ questionarios, respostas }: RelatoriosViewProps
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-slate-500">Perfil de respondente</label>
+              <label className="text-xs text-slate-500">Tipo de respondente</label>
               <select
-                value={filtroRole}
-                onChange={(e) => setFiltroRole(e.target.value)}
+                value={filtroTipo}
+                onChange={(e) => setFiltroTipo(e.target.value)}
                 className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
               >
-                <option value="todos">Todos os perfis</option>
-                {rolesPresentes.map((role) => (
-                  <option key={role} value={role}>
-                    {ROLE_LABEL[role]}
+                <option value="todos">Todos os tipos</option>
+                {tiposPresentes.map((tipo) => (
+                  <option key={tipo} value={tipo}>
+                    {TIPO_LABEL[tipo]}
                   </option>
                 ))}
               </select>
             </div>
 
-            {(filtroPeriodo !== "todos" || filtroRole !== "todos") && (
+            {(filtroPeriodo !== "todos" || filtroTipo !== "todos") && (
               <div className="flex items-end">
                 <Button
                   variant="ghost"
@@ -118,7 +119,7 @@ export function RelatoriosView({ questionarios, respostas }: RelatoriosViewProps
                   className="text-slate-400 hover:text-slate-600 text-xs"
                   onClick={() => {
                     setFiltroPeriodo("todos");
-                    setFiltroRole("todos");
+                    setFiltroTipo("todos");
                   }}
                 >
                   Limpar filtros

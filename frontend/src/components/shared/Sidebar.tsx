@@ -34,7 +34,7 @@ export function Sidebar({
           <img src={logoIFB} alt="Logo IFB" className="h-10 w-auto" />
 
           <span className="text-2xl font-semibold tracking-tight text-slate-900">
-            Avaliaçao IFB
+            Avaliação IFB
           </span>
         </div>
       </div>
@@ -48,7 +48,7 @@ export function Sidebar({
             <nav className="space-y-1">
               {section.items.map((item) => {
                 const baseClass =
-                  "flex items-center gap-3 rounded-xl px-4 py-3 text-1x1 font-medium";
+                  "flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium";
                 const activeClass = item.active
                   ? "border border-slate-300 bg-slate-200 text-emerald-600"
                   : "text-slate-600 hover:bg-slate-200";
@@ -86,9 +86,9 @@ export function Sidebar({
       <div className="border-t border-slate-300 p-5">
         <div className="mb-4">
           <p className="text-2xl font-semibold text-slate-900">
-            {userName ?? "Usuario IFB"}
+            {userName ?? "Usuário IFB"}
           </p>
-          <p className="text-sm text-slate-500">{userRoleLabel ?? "Usuario"}</p>
+          <p className="text-sm text-slate-500">{userRoleLabel ?? "Usuário"}</p>
         </div>
         <button
           type="button"

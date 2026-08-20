@@ -9,7 +9,7 @@ import { LIKERT_ESCALAS } from "@/types/questionario";
 interface ResponderViewProps {
   questionario: Questionario;
   respondentId: string | null;
-  respondentRole: Resposta["respondentRole"];
+  respondentTipo: Resposta["respondentTipo"];
   onSubmit: (r: Resposta) => void;
   onCancelar: () => void;
 }
@@ -122,7 +122,7 @@ function QuestaoDissertativa({
 export function ResponderView({
   questionario,
   respondentId,
-  respondentRole,
+  respondentTipo,
   onSubmit,
   onCancelar,
 }: ResponderViewProps) {
@@ -156,7 +156,7 @@ export function ResponderView({
       id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
       questionarioId: questionario.id,
       respondentId,
-      respondentRole,
+      respondentTipo,
       respostas: questionario.questoes
         .map((q) => respostas[q.id])
         .filter(Boolean),

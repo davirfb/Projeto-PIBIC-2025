@@ -1,14 +1,14 @@
-import { createContext, useContext, useState, useEffect } from "react"
+import { createContext, useContext, useState, useEffect, useCallback } from "react"
 import type { ReactNode } from "react"
 import type { Questionario, QuestaoTipo, LikertEscalaId, QuestionarioStatus } from "@/types/questionario"
 import type { Resposta } from "@/types/resposta"
-import type { UserRole } from "@/types/user"
-import { api } from "@/services/api"
+import type { UserTipo } from "@/types/user"
+import { supabase } from "@/lib/supabase"
 
-// ---- Data mappers ----
+// ---- Mappers ----
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function fromApiQ(raw: Record<string, any>): Questionario {
+function fromDbQ(raw: Record<string, any>): Questionario {
   return {
     id: raw.id,
     titulo: raw.titulo,
@@ -17,50 +17,35 @@ function fromApiQ(raw: Record<string, any>): Questionario {
     dataFim: String(raw.data_fim),
     anonimo: raw.anonimo,
     status: raw.status as QuestionarioStatus,
+    comissaoId: raw.comissao_id ?? undefined,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    questoes: (raw.questoes ?? []).map((q: Record<string, any>) => ({
+    questoes: (raw.questoes ?? []).sort((a: any, b: any) => a.ordem - b.ordem).map((q: Record<string, any>) => ({
       id: q.id,
       tipo: q.tipo as QuestaoTipo,
       enunciado: q.enunciado,
       obrigatoria: q.obrigatoria,
       likertEscala: (q.likert_escala ?? undefined) as LikertEscalaId | undefined,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      opcoes: (q.opcoes ?? []).map((o: Record<string, any>) => ({ id: o.id, texto: o.texto })),
+      opcoes: (q.opcoes ?? []).sort((a: any, b: any) => a.ordem - b.ordem).map((o: Record<string, any>) => ({
+        id: o.id,
+        texto: o.texto,
+      })),
     })),
-    cursos: raw.curso_ids ?? [],
+    cursos: (raw.questionario_cursos ?? []).map((qc: { curso_id: string }) => qc.curso_id),
     criadoEm: String(raw.criado_em),
     atualizadoEm: String(raw.atualizado_em),
   }
 }
 
-function toApiPayload(q: Questionario) {
-  return {
-    titulo: q.titulo,
-    descricao: q.descricao,
-    data_inicio: q.dataInicio,
-    data_fim: q.dataFim,
-    anonimo: q.anonimo,
-    curso_ids: q.cursos,
-    questoes: q.questoes.map((qu, i) => ({
-      enunciado: qu.enunciado,
-      tipo: qu.tipo,
-      obrigatoria: qu.obrigatoria,
-      likert_escala: qu.likertEscala ?? null,
-      ordem: i,
-      opcoes: (qu.opcoes ?? []).map((o, oi) => ({ texto: o.texto, ordem: oi })),
-    })),
-  }
-}
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function fromApiResposta(raw: Record<string, any>): Resposta {
+function fromDbResposta(raw: Record<string, any>): Resposta {
   return {
     id: raw.id,
     questionarioId: raw.questionario_id,
-    respondentId: null, // nunca exposto pela API (RN04)
-    respondentRole: raw.respondente_role as UserRole,
+    respondentId: null, // nunca exposto para comissão/adm (RN04)
+    respondentTipo: raw.respondente_tipo as UserTipo,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    respostas: (raw.respostas_questao ?? []).map((rq: Record<string, any>) => ({
+    respostas: (raw.respostas_questoes ?? []).map((rq: Record<string, any>) => ({
       questaoId: rq.questao_id,
       opcaoId: rq.opcao_id ?? undefined,
       likertValor: rq.likert_valor ?? undefined,
@@ -90,87 +75,168 @@ const QuestionarioContext = createContext<QuestionarioContextValue | null>(null)
 
 interface QuestionarioProviderProps {
   children: ReactNode
-  userRole: UserRole
+  isAdm: boolean
+  hasComissao: boolean
+  comissaoId?: string
+  userId: string
+  userTipo: UserTipo
 }
 
-export function QuestionarioProvider({ children, userRole }: QuestionarioProviderProps) {
+export function QuestionarioProvider({ children, isAdm, hasComissao, comissaoId, userId, userTipo }: QuestionarioProviderProps) {
   const [questionarios, setQuestionarios] = useState<Questionario[]>([])
   const [respostas, setRespostas] = useState<Resposta[]>([])
   const [respondidosIds, setRespondidosIds] = useState<Set<string>>(new Set())
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    let cancelled = false
-
-    async function loadData() {
-      setIsLoading(true)
-      setError(null)
-      try {
-        const rawQs = await api.get("/questionarios/")
-        const qs: Questionario[] = rawQs.map(fromApiQ)
-        if (cancelled) return
-        setQuestionarios(qs)
-
-        if (userRole === "comissao" || userRole === "adm") {
-          const allRespostas: Resposta[] = []
-          await Promise.all(
-            qs.map(async (q) => {
-              try {
-                const rawRs = await api.get(`/respostas/questionario/${q.id}`)
-                allRespostas.push(...rawRs.map(fromApiResposta))
-              } catch {
-                // erros individuais são silenciados — relatório fica incompleto mas não quebra
-              }
-            }),
+  const loadData = useCallback(async () => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const { data: rawQs, error: qError } = await supabase
+        .from("questionarios")
+        .select(`
+          *,
+          questionario_cursos(curso_id),
+          questoes(id, tipo, enunciado, obrigatoria, likert_escala, ordem,
+            opcoes(id, texto, ordem)
           )
-          if (!cancelled) setRespostas(allRespostas)
-        } else {
-          // respondente / padrao: só o próprio histórico (para jaRespondeu)
-          try {
-            const rawHist = await api.get("/respostas/meu-historico")
-            if (!cancelled) {
-              const hist: Resposta[] = rawHist.map(fromApiResposta)
-              setRespostas(hist)
-              setRespondidosIds(new Set(hist.map((r) => r.questionarioId)))
-            }
-          } catch {
-            // silencia — jaRespondeu retorna false por padrão
-          }
-        }
-      } catch (err) {
-        if (!cancelled)
-          setError(err instanceof Error ? err.message : "Erro ao carregar dados.")
-      } finally {
-        if (!cancelled) setIsLoading(false)
-      }
-    }
+        `)
+        .order("criado_em", { ascending: false })
 
-    loadData()
-    return () => {
-      cancelled = true
+      if (qError) throw qError
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      setQuestionarios((rawQs as Record<string, any>[]).map(fromDbQ))
+
+      if (isAdm || hasComissao) {
+        const { data: rawRs } = await supabase
+          .from("respostas")
+          .select("*, respostas_questoes(*)")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setRespostas((rawRs ?? []).map((r: Record<string, any>) => fromDbResposta(r)))
+      } else {
+        const { data: rawRs } = await supabase
+          .from("respostas")
+          .select("*, respostas_questoes(*)")
+          .eq("respondente_id", userId)
+        const hist = (rawRs ?? []).map(fromDbResposta)
+        setRespostas(hist)
+        setRespondidosIds(new Set(rawRs?.map((r) => r.questionario_id as string) ?? []))
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao carregar dados.")
+    } finally {
+      setIsLoading(false)
     }
-  }, [userRole])
+  }, [isAdm, hasComissao, userId])
+
+  useEffect(() => {
+    void loadData()
+  }, [loadData])
 
   async function upsert(q: Questionario) {
-    const payload = toApiPayload(q)
     const isExisting = questionarios.some((p) => p.id === q.id)
+
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let result: Record<string, any>
+      let questionarioId: string
+
       if (isExisting) {
-        result = await api.put(`/questionarios/${q.id}`, payload)
+        const updates: Record<string, unknown> = {
+          titulo: q.titulo,
+          descricao: q.descricao,
+          data_inicio: q.dataInicio,
+          data_fim: q.dataFim,
+          anonimo: q.anonimo,
+        }
+        if (q.status === "publicado") updates.status = "publicado"
+
+        const { error: uError } = await supabase
+          .from("questionarios")
+          .update(updates)
+          .eq("id", q.id)
+        if (uError) throw uError
+        questionarioId = q.id
       } else {
-        result = await api.post("/questionarios/", payload)
+        const { data: created, error: iError } = await supabase
+          .from("questionarios")
+          .insert({
+            titulo: q.titulo,
+            descricao: q.descricao,
+            data_inicio: q.dataInicio,
+            data_fim: q.dataFim,
+            anonimo: q.anonimo,
+            status: "rascunho",
+            criado_por_id: userId,
+            comissao_id: q.comissaoId ?? comissaoId ?? null,
+          })
+          .select("id")
+          .single()
+        if (iError || !created) throw iError ?? new Error("Erro ao criar questionário")
+        questionarioId = created.id as string
+
+        if (q.status === "publicado") {
+          await supabase
+            .from("questionarios")
+            .update({ status: "publicado" })
+            .eq("id", questionarioId)
+        }
       }
-      if (q.status === "publicado" && result.status === "rascunho") {
-        result = await api.patch(`/questionarios/${result.id}/publicar`, {})
+
+      // Sincroniza cursos
+      await supabase.from("questionario_cursos").delete().eq("questionario_id", questionarioId)
+      if (q.cursos.length > 0) {
+        await supabase.from("questionario_cursos").insert(
+          q.cursos.map((cid) => ({ questionario_id: questionarioId, curso_id: cid })),
+        )
       }
-      const saved = fromApiQ(result)
-      setQuestionarios((prev) => {
-        const exists = prev.some((p) => p.id === saved.id)
-        return exists ? prev.map((p) => (p.id === saved.id ? saved : p)) : [...prev, saved]
-      })
+
+      // Sincroniza questões (delete + re-insert — RN03 impede em publicados)
+      await supabase.from("questoes").delete().eq("questionario_id", questionarioId)
+      for (let i = 0; i < q.questoes.length; i++) {
+        const qu = q.questoes[i]
+        const { data: questao, error: qErr } = await supabase
+          .from("questoes")
+          .insert({
+            questionario_id: questionarioId,
+            enunciado: qu.enunciado,
+            tipo: qu.tipo,
+            obrigatoria: qu.obrigatoria,
+            likert_escala: qu.likertEscala ?? null,
+            ordem: i,
+          })
+          .select("id")
+          .single()
+        if (qErr || !questao) throw qErr ?? new Error("Erro ao criar questão")
+
+        if (qu.opcoes && qu.opcoes.length > 0) {
+          await supabase.from("opcoes").insert(
+            qu.opcoes.map((o, oi) => ({
+              questao_id: questao.id as string,
+              texto: o.texto,
+              ordem: oi,
+            })),
+          )
+        }
+      }
+
+      const { data: refreshed } = await supabase
+        .from("questionarios")
+        .select(`
+          *,
+          questionario_cursos(curso_id),
+          questoes(id, tipo, enunciado, obrigatoria, likert_escala, ordem,
+            opcoes(id, texto, ordem)
+          )
+        `)
+        .eq("id", questionarioId)
+        .single()
+
+      if (refreshed) {
+        const saved = fromDbQ(refreshed as Record<string, unknown>)
+        setQuestionarios((prev) =>
+          isExisting ? prev.map((p) => (p.id === saved.id ? saved : p)) : [...prev, saved],
+        )
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Erro ao salvar questionário."
       setError(msg)
@@ -179,53 +245,63 @@ export function QuestionarioProvider({ children, userRole }: QuestionarioProvide
   }
 
   async function encerrar(id: string) {
-    try {
-      const result = await api.patch(`/questionarios/${id}/encerrar`, {})
-      const saved = fromApiQ(result)
-      setQuestionarios((prev) => prev.map((q) => (q.id === id ? saved : q)))
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Erro ao encerrar questionário."
-      setError(msg)
-      throw new Error(msg)
-    }
+    const { error } = await supabase
+      .from("questionarios")
+      .update({ status: "encerrado" })
+      .eq("id", id)
+    if (error) { setError(error.message); throw error }
+    setQuestionarios((prev) => prev.map((q) => (q.id === id ? { ...q, status: "encerrado" as QuestionarioStatus } : q)))
   }
 
   async function arquivar(id: string) {
-    try {
-      const result = await api.patch(`/questionarios/${id}/arquivar`, {})
-      const saved = fromApiQ(result)
-      setQuestionarios((prev) => prev.map((q) => (q.id === id ? saved : q)))
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Erro ao arquivar questionário."
-      setError(msg)
-      throw new Error(msg)
-    }
+    const { error } = await supabase
+      .from("questionarios")
+      .update({ status: "arquivado" })
+      .eq("id", id)
+    if (error) { setError(error.message); throw error }
+    setQuestionarios((prev) => prev.map((q) => (q.id === id ? { ...q, status: "arquivado" as QuestionarioStatus } : q)))
   }
 
   async function excluir(id: string) {
-    try {
-      await api.delete(`/questionarios/${id}`)
-      setQuestionarios((prev) => prev.filter((q) => q.id !== id))
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Erro ao excluir questionário."
-      setError(msg)
-      throw new Error(msg)
-    }
+    const { error } = await supabase.from("questionarios").delete().eq("id", id)
+    if (error) { setError(error.message); throw error }
+    setQuestionarios((prev) => prev.filter((q) => q.id !== id))
   }
 
   async function submeterResposta(r: Resposta) {
-    const payload = {
-      questionario_id: r.questionarioId,
-      respostas: r.respostas.map((rq) => ({
-        questao_id: rq.questaoId,
-        opcao_id: rq.opcaoId ?? null,
-        likert_valor: rq.likertValor ?? null,
-        texto: rq.texto ?? null,
-      })),
-    }
     try {
-      const result = await api.post("/respostas/", payload)
-      const saved = fromApiResposta(result)
+      const { data: resposta, error: rError } = await supabase
+        .from("respostas")
+        .insert({
+          questionario_id: r.questionarioId,
+          respondente_id: userId,
+          respondente_tipo: userTipo,
+        })
+        .select("id")
+        .single()
+      if (rError || !resposta) throw rError ?? new Error("Erro ao submeter resposta")
+
+      if (r.respostas.length > 0) {
+        const { error: rqError } = await supabase.from("respostas_questoes").insert(
+          r.respostas.map((rq) => ({
+            resposta_id: resposta.id as string,
+            questao_id: rq.questaoId,
+            opcao_id: rq.opcaoId ?? null,
+            likert_valor: rq.likertValor ?? null,
+            texto: rq.texto ?? null,
+          })),
+        )
+        if (rqError) throw rqError
+      }
+
+      const saved: Resposta = {
+        id: resposta.id as string,
+        questionarioId: r.questionarioId,
+        respondentId: null,
+        respondentTipo: userTipo,
+        respostas: r.respostas,
+        submetidoEm: new Date().toISOString(),
+      }
       setRespostas((prev) => [...prev, saved])
       setRespondidosIds((prev) => new Set([...prev, r.questionarioId]))
     } catch (err) {
@@ -243,7 +319,7 @@ export function QuestionarioProvider({ children, userRole }: QuestionarioProvide
   }
 
   function jaRespondeu(_respondentId: string, questionarioId: string): boolean {
-    if (userRole === "respondente" || userRole === "padrao") {
+    if (!isAdm && !hasComissao) {
       return respondidosIds.has(questionarioId)
     }
     return respostas.some((r) => r.questionarioId === questionarioId)
