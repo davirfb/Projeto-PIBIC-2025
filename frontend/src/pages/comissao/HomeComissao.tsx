@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useQuestionario } from "@/context/QuestionarioContext";
+import { useChecklist } from "@/demo/ChecklistContext";
 import { ParticipacaoView } from "./ParticipacaoView";
 import { RelatoriosView } from "./RelatoriosView";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,47 +32,34 @@ import {
   StopCircle,
   CalendarDays,
   TrendingUp,
+  ArrowLeft,
+  Settings2,
 } from "lucide-react";
 import { QuestionarioForm } from "./QuestionarioForm";
-import { EvolucaoCursoView } from "./EvolucaoCursoView";
+import { EvolucaoCursoView, EIXOS_PADRAO_TSI } from "./EvolucaoCursoView";
+import { ConfiguracaoPesquisaView } from "./ConfiguracaoPesquisaView";
 import type { Questionario, QuestionarioStatus } from "@/types/questionario";
+import type { Eixo } from "@/types/questionario";
 
-type Section = "questionarios" | "form" | "participacao" | "relatorios" | "evolucao";
+type Section = "questionarios" | "form" | "participacao" | "relatorios" | "evolucao" | "config-pesquisa";
 
 interface HomeComissaoProps {
   onLogout?: () => void;
   userName?: string;
+  onVoltar?: () => void;
 }
 
-
-const STATUS_CONFIG: Record<
-  QuestionarioStatus,
-  { label: string; color: string }
-> = {
-  rascunho: {
-    label: "Rascunho",
-    color: "bg-slate-100 text-slate-600 border-slate-300",
-  },
-  publicado: {
-    label: "Publicado",
-    color: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  },
-  encerrado: {
-    label: "Encerrado",
-    color: "bg-blue-50 text-blue-700 border-blue-200",
-  },
-  arquivado: {
-    label: "Arquivado",
-    color: "bg-amber-50 text-amber-700 border-amber-200",
-  },
+const STATUS_CONFIG: Record<QuestionarioStatus, { label: string; color: string }> = {
+  rascunho:  { label: "Rascunho",  color: "bg-slate-100 text-slate-600 border-slate-300" },
+  publicado: { label: "Publicado", color: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  encerrado: { label: "Encerrado", color: "bg-blue-50 text-blue-700 border-blue-200" },
+  arquivado: { label: "Arquivado", color: "bg-amber-50 text-amber-700 border-amber-200" },
 };
 
 function deleteWarning(status: QuestionarioStatus): string {
-  if (status === "rascunho")
-    return "Tem certeza que deseja excluir este rascunho? Esta ação não pode ser desfeita.";
-  if (status === "publicado")
-    return "Atenção! Este questionário está publicado e pode ter respostas em andamento. Excluí-lo removerá permanentemente o questionário e todas as suas respostas. Esta ação não pode ser desfeita.";
-  return "Atenção! Este questionário possui respostas coletadas. Excluí-lo removerá permanentemente o questionário e todos os seus dados. Esta ação não pode ser desfeita.";
+  if (status === "rascunho") return "Tem certeza que deseja excluir este rascunho? Esta ação não pode ser desfeita.";
+  if (status === "publicado") return "Atenção! Este questionário está publicado e pode ter respostas em andamento. Excluir removerá permanentemente o questionário e todas as suas respostas. Esta ação não pode ser desfeita.";
+  return "Atenção! Este questionário possui respostas coletadas. Excluir removerá permanentemente o questionário e todos os seus dados. Esta ação não pode ser desfeita.";
 }
 
 interface QuestionarioCardProps {
@@ -82,39 +70,25 @@ interface QuestionarioCardProps {
   onExcluir: () => void;
 }
 
-function QuestionarioCard({
-  questionario,
-  onEditar,
-  onEncerrar,
-  onArquivar,
-  onExcluir,
-}: QuestionarioCardProps) {
+function QuestionarioCard({ questionario, onEditar, onEncerrar, onArquivar, onExcluir }: QuestionarioCardProps) {
   const { label, color } = STATUS_CONFIG[questionario.status];
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-3 shadow-sm">
+    <div className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5 space-y-3 shadow-sm">
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-1 flex-1 min-w-0">
-          <h3 className="font-semibold text-slate-900 truncate">
-            {questionario.titulo}
-          </h3>
+          <h3 className="font-semibold text-slate-900 text-sm sm:text-base">{questionario.titulo}</h3>
           {questionario.descricao && (
-            <p className="text-sm text-slate-500 line-clamp-1">
-              {questionario.descricao}
-            </p>
+            <p className="text-sm text-slate-500 line-clamp-1">{questionario.descricao}</p>
           )}
         </div>
-        <Badge variant="outline" className={`shrink-0 text-xs ${color}`}>
-          {label}
-        </Badge>
+        <Badge variant="outline" className={`shrink-0 text-xs ${color}`}>{label}</Badge>
       </div>
 
-      <div className="flex items-center gap-4 text-xs text-slate-500">
+      <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
         <span className="flex items-center gap-1">
           <CalendarDays className="h-3.5 w-3.5" />
-          {questionario.dataInicio
-            ? `${questionario.dataInicio} → ${questionario.dataFim}`
-            : "Sem vigência definida"}
+          {questionario.dataInicio ? `${questionario.dataInicio} até ${questionario.dataFim}` : "Sem vigência definida"}
         </span>
         <span className="flex items-center gap-1">
           <ClipboardList className="h-3.5 w-3.5" />
@@ -124,61 +98,34 @@ function QuestionarioCard({
 
       <div className="flex items-center gap-2 pt-1 flex-wrap">
         {questionario.status === "rascunho" && (
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-7 text-xs border-slate-200 text-slate-600 hover:bg-slate-50 flex gap-1"
-            onClick={onEditar}
-          >
+          <Button size="sm" variant="outline" className="h-7 text-xs border-slate-200 text-slate-600 hover:bg-slate-50 flex gap-1" onClick={onEditar}>
             <Pencil className="h-3 w-3" /> Editar
           </Button>
         )}
-
         {questionario.status === "publicado" && (
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-7 text-xs border-blue-200 text-blue-600 hover:bg-blue-50 flex gap-1"
-            onClick={onEncerrar}
-          >
+          <Button size="sm" variant="outline" className="h-7 text-xs border-blue-200 text-blue-600 hover:bg-blue-50 flex gap-1" onClick={onEncerrar}>
             <StopCircle className="h-3 w-3" /> Encerrar
           </Button>
         )}
-
         {questionario.status === "encerrado" && (
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-7 text-xs border-amber-200 text-amber-600 hover:bg-amber-50 flex gap-1"
-            onClick={onArquivar}
-          >
+          <Button size="sm" variant="outline" className="h-7 text-xs border-amber-200 text-amber-600 hover:bg-amber-50 flex gap-1" onClick={onArquivar}>
             <Archive className="h-3 w-3" /> Arquivar
           </Button>
         )}
-
         <AlertDialog>
           <AlertDialogTrigger asChild>
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-7 text-xs border-red-200 text-red-500 hover:bg-red-50 flex gap-1"
-            >
+            <Button size="sm" variant="outline" className="h-7 text-xs border-red-200 text-red-500 hover:bg-red-50 flex gap-1">
               <Trash2 className="h-3 w-3" /> Excluir
             </Button>
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Excluir questionário?</AlertDialogTitle>
-              <AlertDialogDescription>
-                {deleteWarning(questionario.status)}
-              </AlertDialogDescription>
+              <AlertDialogDescription>{deleteWarning(questionario.status)}</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={onExcluir}
-                className="bg-red-500 hover:bg-red-600 text-white"
-              >
+              <AlertDialogAction onClick={onExcluir} className="bg-red-500 hover:bg-red-600 text-white">
                 Sim, excluir
               </AlertDialogAction>
             </AlertDialogFooter>
@@ -198,76 +145,34 @@ interface QuestionariosViewProps {
   onExcluir: (id: string) => void;
 }
 
-export function QuestionariosView({
-  questionarios,
-  onNovo,
-  onEditar,
-  onEncerrar,
-  onArquivar,
-  onExcluir,
-}: QuestionariosViewProps) {
-  const rascunhos = questionarios.filter((q) => q.status === "rascunho").length;
-  const publicados = questionarios.filter(
-    (q) => q.status === "publicado",
-  ).length;
-  const encerrados = questionarios.filter(
-    (q) => q.status === "encerrado",
-  ).length;
+export function QuestionariosView({ questionarios, onNovo, onEditar, onEncerrar, onArquivar, onExcluir }: QuestionariosViewProps) {
+  const rascunhos  = questionarios.filter((q) => q.status === "rascunho").length;
+  const publicados = questionarios.filter((q) => q.status === "publicado").length;
+  const encerrados = questionarios.filter((q) => q.status === "encerrado").length;
 
   const stats = [
-    {
-      label: "Em Rascunho",
-      value: rascunhos,
-      icon: ClipboardList,
-      color: "text-slate-500",
-      bg: "bg-slate-100",
-    },
-    {
-      label: "Publicados",
-      value: publicados,
-      icon: Clock,
-      color: "text-emerald-500",
-      bg: "bg-emerald-50",
-    },
-    {
-      label: "Encerrados",
-      value: encerrados,
-      icon: Archive,
-      color: "text-blue-500",
-      bg: "bg-blue-50",
-    },
+    { label: "Em Rascunho", value: rascunhos,  icon: ClipboardList, color: "text-slate-500",  bg: "bg-slate-100" },
+    { label: "Publicados",  value: publicados, icon: Clock,          color: "text-emerald-500", bg: "bg-emerald-50" },
+    { label: "Encerrados",  value: encerrados, icon: Archive,        color: "text-blue-500",   bg: "bg-blue-50" },
   ];
 
   return (
-    <div className="p-8 space-y-8">
-      <div className="flex items-start justify-between">
+    <div className="p-4 sm:p-8 space-y-6 sm:space-y-8">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">
-            Meus Questionários
-          </h1>
-          <p className="text-slate-500 mt-1">
-            Gerencie os questionários avaliativos
-          </p>
+          <h1 className="text-xl sm:text-2xl font-semibold text-slate-900">Meus Questionários</h1>
+          <p className="text-slate-500 mt-1 text-sm">Gerencie os questionários avaliativos</p>
         </div>
-        <Button
-          className="bg-emerald-500 hover:bg-emerald-600 text-white flex items-center gap-2"
-          onClick={onNovo}
-        >
-          <Plus className="h-4 w-4" />
-          Novo Questionário
+        <Button className="bg-emerald-500 hover:bg-emerald-600 text-white flex items-center gap-2 self-start" onClick={onNovo}>
+          <Plus className="h-4 w-4" /> Novo Questionário
         </Button>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {stats.map((stat) => (
-          <Card
-            key={stat.label}
-            className="border-slate-200 shadow-sm bg-white"
-          >
+          <Card key={stat.label} className="border-slate-200 shadow-sm bg-white">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-slate-600">
-                {stat.label}
-              </CardTitle>
+              <CardTitle className="text-sm font-medium text-slate-600">{stat.label}</CardTitle>
               <div className={`rounded-lg p-2 ${stat.bg}`}>
                 <stat.icon className={`h-4 w-4 ${stat.color}`} />
               </div>
@@ -281,23 +186,14 @@ export function QuestionariosView({
 
       <Card className="border-slate-200 shadow-sm bg-white">
         <CardHeader>
-          <CardTitle className="text-base text-slate-900">
-            Lista de Questionários
-          </CardTitle>
+          <CardTitle className="text-base text-slate-900">Lista de Questionários</CardTitle>
         </CardHeader>
         <CardContent>
           {questionarios.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-40 text-slate-400 gap-3">
               <ClipboardCheck className="h-8 w-8" />
-              <p className="text-sm font-medium">
-                Nenhum questionário criado ainda.
-              </p>
-              <Button
-                variant="outline"
-                size="sm"
-                className="border-emerald-200 text-emerald-600 hover:bg-emerald-50"
-                onClick={onNovo}
-              >
+              <p className="text-sm font-medium">Nenhum questionário criado ainda.</p>
+              <Button variant="outline" size="sm" className="border-emerald-200 text-emerald-600 hover:bg-emerald-50" onClick={onNovo}>
                 Criar primeiro questionário
               </Button>
             </div>
@@ -321,19 +217,26 @@ export function QuestionariosView({
   );
 }
 
-const CURSOS_COMISSAO_MOCK = [
-  { id: "tsi-001", nome: "Tecnologia em Sistemas para Internet (TSI)" },
-];
+const CURSOS_COMISSAO_MOCK = [{ id: "tsi-001", nome: "Tecnologia em Sistemas para Internet (TSI)" }];
 
-export function HomeComissao({ onLogout, userName }: HomeComissaoProps) {
+export function HomeComissao({ onLogout, userName, onVoltar }: HomeComissaoProps) {
   const [section, setSection] = useState<Section>("questionarios");
   const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [eixos, setEixos] = useState<Eixo[]>(EIXOS_PADRAO_TSI);
+  // extraímos só markVisited — função estável (useCallback) que não causa re-render loop
+  const markVisited = useChecklist()?.markVisited;
 
   const { questionarios, respostas, upsert, encerrar, arquivar, excluir } = useQuestionario();
 
-  const questionarioEditando = editandoId
-    ? questionarios.find((q) => q.id === editandoId)
-    : undefined;
+  const questionarioEditando = editandoId ? questionarios.find((q) => q.id === editandoId) : undefined;
+
+  useEffect(() => {
+    if (section === "questionarios")  markVisited?.("ver-questionarios");
+    if (section === "participacao")   markVisited?.("ver-participacao");
+    if (section === "relatorios")     markVisited?.("ver-relatorios");
+    if (section === "evolucao")       markVisited?.("ver-evolucao");
+    if (section === "config-pesquisa") markVisited?.("config-pesquisa");
+  }, [section, markVisited]);
 
   async function handleSalvarRascunho(q: Questionario) {
     await upsert(q);
@@ -347,15 +250,8 @@ export function HomeComissao({ onLogout, userName }: HomeComissaoProps) {
     setSection("questionarios");
   }
 
-  function handleEditar(id: string) {
-    setEditandoId(id);
-    setSection("form");
-  }
-
-  function handleCancelar() {
-    setEditandoId(null);
-    setSection("questionarios");
-  }
+  function handleEditar(id: string) { setEditandoId(id); setSection("form"); }
+  function handleCancelar() { setEditandoId(null); setSection("questionarios"); }
 
   const navSections = [
     {
@@ -365,19 +261,13 @@ export function HomeComissao({ onLogout, userName }: HomeComissaoProps) {
           label: "Meus Questionários",
           icon: <ClipboardList className="h-5 w-5" />,
           active: section === "questionarios",
-          onClick: () => {
-            setEditandoId(null);
-            setSection("questionarios");
-          },
+          onClick: () => { setEditandoId(null); setSection("questionarios"); },
         },
         {
           label: "Novo Questionário",
           icon: <ClipboardPlus className="h-5 w-5" />,
           active: section === "form" && !editandoId,
-          onClick: () => {
-            setEditandoId(null);
-            setSection("form");
-          },
+          onClick: () => { setEditandoId(null); setSection("form"); },
         },
       ],
     },
@@ -404,6 +294,17 @@ export function HomeComissao({ onLogout, userName }: HomeComissaoProps) {
         },
       ],
     },
+    {
+      title: "Configurações",
+      items: [
+        {
+          label: "Configuração de Pesquisa",
+          icon: <Settings2 className="h-5 w-5" />,
+          active: section === "config-pesquisa",
+          onClick: () => setSection("config-pesquisa"),
+        },
+      ],
+    },
   ];
 
   return (
@@ -413,13 +314,23 @@ export function HomeComissao({ onLogout, userName }: HomeComissaoProps) {
       userRoleLabel="Comissão"
       navSections={navSections}
     >
+      {onVoltar && (
+        <div className="border-b border-slate-200 bg-white px-4 sm:px-6 py-2 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onVoltar}
+            className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-emerald-600 transition-colors"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Voltar à minha área
+          </button>
+        </div>
+      )}
+
       {section === "questionarios" && (
         <QuestionariosView
           questionarios={questionarios}
-          onNovo={() => {
-            setEditandoId(null);
-            setSection("form");
-          }}
+          onNovo={() => { setEditandoId(null); setSection("form"); }}
           onEditar={handleEditar}
           onEncerrar={encerrar}
           onArquivar={arquivar}
@@ -441,7 +352,11 @@ export function HomeComissao({ onLogout, userName }: HomeComissaoProps) {
       {section === "relatorios" && (
         <RelatoriosView questionarios={questionarios} respostas={respostas} />
       )}
-      {section === "evolucao" && <EvolucaoCursoView />}
+      {section === "evolucao" && <EvolucaoCursoView eixos={eixos} />}
+      {section === "config-pesquisa" && (
+        <ConfiguracaoPesquisaView eixos={eixos} onEixosChange={setEixos} />
+      )}
+
     </AppLayout>
   );
 }

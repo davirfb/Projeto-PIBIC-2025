@@ -2,8 +2,17 @@ import { createContext, useContext, useState, useEffect, useCallback } from "rea
 import type { ReactNode } from "react"
 import type { Questionario, QuestaoTipo, LikertEscalaId, QuestionarioStatus } from "@/types/questionario"
 import type { Resposta } from "@/types/resposta"
-import type { UserTipo } from "@/types/user"
+import type { UserRole } from "@/types/user"
 import { supabase } from "@/lib/supabase"
+import {
+  DEMO_MODE,
+  DEMO_QUESTIONARIOS,
+  DEMO_RESPOSTAS,
+  DEMO_RESPOSTAS_ANA,
+  DEMO_RESPONDIDOS_ANA,
+  DEMO_RESPOSTAS_LUCAS,
+  DEMO_RESPONDIDOS_LUCAS,
+} from "@/demo/demoData"
 
 // ---- Mappers ----
 
@@ -17,7 +26,6 @@ function fromDbQ(raw: Record<string, any>): Questionario {
     dataFim: String(raw.data_fim),
     anonimo: raw.anonimo,
     status: raw.status as QuestionarioStatus,
-    comissaoId: raw.comissao_id ?? undefined,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     questoes: (raw.questoes ?? []).sort((a: any, b: any) => a.ordem - b.ordem).map((q: Record<string, any>) => ({
       id: q.id,
@@ -42,8 +50,8 @@ function fromDbResposta(raw: Record<string, any>): Resposta {
   return {
     id: raw.id,
     questionarioId: raw.questionario_id,
-    respondentId: null, // nunca exposto para comissão/adm (RN04)
-    respondentTipo: raw.respondente_tipo as UserTipo,
+    respondentId: null,
+    respondentRole: raw.respondente_role as UserRole,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     respostas: (raw.respostas_questoes ?? []).map((rq: Record<string, any>) => ({
       questaoId: rq.questao_id,
@@ -75,14 +83,11 @@ const QuestionarioContext = createContext<QuestionarioContextValue | null>(null)
 
 interface QuestionarioProviderProps {
   children: ReactNode
-  isAdm: boolean
-  hasComissao: boolean
-  comissaoId?: string
+  userRole: UserRole
   userId: string
-  userTipo: UserTipo
 }
 
-export function QuestionarioProvider({ children, isAdm, hasComissao, comissaoId, userId, userTipo }: QuestionarioProviderProps) {
+export function QuestionarioProvider({ children, userRole, userId }: QuestionarioProviderProps) {
   const [questionarios, setQuestionarios] = useState<Questionario[]>([])
   const [respostas, setRespostas] = useState<Resposta[]>([])
   const [respondidosIds, setRespondidosIds] = useState<Set<string>>(new Set())
@@ -90,6 +95,25 @@ export function QuestionarioProvider({ children, isAdm, hasComissao, comissaoId,
   const [error, setError] = useState<string | null>(null)
 
   const loadData = useCallback(async () => {
+    if (DEMO_MODE) {
+      setQuestionarios(DEMO_QUESTIONARIOS)
+      if (userRole === "adm" || userRole === "comissao") {
+        setRespostas(DEMO_RESPOSTAS)
+      } else if (userId === "demo-estudante-comissao") {
+        // Ana: tem historico de pesquisas anteriores (2024/1 e 2026/1)
+        setRespostas(DEMO_RESPOSTAS_ANA)
+        setRespondidosIds(new Set(DEMO_RESPONDIDOS_ANA))
+      } else if (userId === "demo-aluno-respondente") {
+        // Lucas: tem 2 pesquisas respondidas no historico
+        setRespostas(DEMO_RESPOSTAS_LUCAS)
+        setRespondidosIds(new Set(DEMO_RESPONDIDOS_LUCAS))
+      } else {
+        setRespostas([])
+        setRespondidosIds(new Set())
+      }
+      setIsLoading(false)
+      return
+    }
     setIsLoading(true)
     setError(null)
     try {
@@ -108,7 +132,7 @@ export function QuestionarioProvider({ children, isAdm, hasComissao, comissaoId,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       setQuestionarios((rawQs as Record<string, any>[]).map(fromDbQ))
 
-      if (isAdm || hasComissao) {
+      if (userRole === "adm" || userRole === "comissao") {
         const { data: rawRs } = await supabase
           .from("respostas")
           .select("*, respostas_questoes(*)")
@@ -128,13 +152,20 @@ export function QuestionarioProvider({ children, isAdm, hasComissao, comissaoId,
     } finally {
       setIsLoading(false)
     }
-  }, [isAdm, hasComissao, userId])
+  }, [userRole, userId])
 
   useEffect(() => {
     void loadData()
   }, [loadData])
 
   async function upsert(q: Questionario) {
+    if (DEMO_MODE) {
+      const isExisting = questionarios.some((p) => p.id === q.id)
+      setQuestionarios((prev) =>
+        isExisting ? prev.map((p) => (p.id === q.id ? q : p)) : [q, ...prev],
+      )
+      return
+    }
     const isExisting = questionarios.some((p) => p.id === q.id)
 
     try {
@@ -167,11 +198,10 @@ export function QuestionarioProvider({ children, isAdm, hasComissao, comissaoId,
             anonimo: q.anonimo,
             status: "rascunho",
             criado_por_id: userId,
-            comissao_id: q.comissaoId ?? comissaoId ?? null,
           })
           .select("id")
           .single()
-        if (iError || !created) throw iError ?? new Error("Erro ao criar questionário")
+        if (iError || !created) throw iError ?? new Error("Erro ao criar questionario")
         questionarioId = created.id as string
 
         if (q.status === "publicado") {
@@ -182,7 +212,6 @@ export function QuestionarioProvider({ children, isAdm, hasComissao, comissaoId,
         }
       }
 
-      // Sincroniza cursos
       await supabase.from("questionario_cursos").delete().eq("questionario_id", questionarioId)
       if (q.cursos.length > 0) {
         await supabase.from("questionario_cursos").insert(
@@ -190,7 +219,6 @@ export function QuestionarioProvider({ children, isAdm, hasComissao, comissaoId,
         )
       }
 
-      // Sincroniza questões (delete + re-insert — RN03 impede em publicados)
       await supabase.from("questoes").delete().eq("questionario_id", questionarioId)
       for (let i = 0; i < q.questoes.length; i++) {
         const qu = q.questoes[i]
@@ -206,7 +234,7 @@ export function QuestionarioProvider({ children, isAdm, hasComissao, comissaoId,
           })
           .select("id")
           .single()
-        if (qErr || !questao) throw qErr ?? new Error("Erro ao criar questão")
+        if (qErr || !questao) throw qErr ?? new Error("Erro ao criar questao")
 
         if (qu.opcoes && qu.opcoes.length > 0) {
           await supabase.from("opcoes").insert(
@@ -238,13 +266,17 @@ export function QuestionarioProvider({ children, isAdm, hasComissao, comissaoId,
         )
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Erro ao salvar questionário."
+      const msg = err instanceof Error ? err.message : "Erro ao salvar questionario."
       setError(msg)
       throw new Error(msg)
     }
   }
 
   async function encerrar(id: string) {
+    if (DEMO_MODE) {
+      setQuestionarios((prev) => prev.map((q) => (q.id === id ? { ...q, status: "encerrado" as QuestionarioStatus } : q)))
+      return
+    }
     const { error } = await supabase
       .from("questionarios")
       .update({ status: "encerrado" })
@@ -254,6 +286,10 @@ export function QuestionarioProvider({ children, isAdm, hasComissao, comissaoId,
   }
 
   async function arquivar(id: string) {
+    if (DEMO_MODE) {
+      setQuestionarios((prev) => prev.map((q) => (q.id === id ? { ...q, status: "arquivado" as QuestionarioStatus } : q)))
+      return
+    }
     const { error } = await supabase
       .from("questionarios")
       .update({ status: "arquivado" })
@@ -263,19 +299,29 @@ export function QuestionarioProvider({ children, isAdm, hasComissao, comissaoId,
   }
 
   async function excluir(id: string) {
+    if (DEMO_MODE) {
+      setQuestionarios((prev) => prev.filter((q) => q.id !== id))
+      return
+    }
     const { error } = await supabase.from("questionarios").delete().eq("id", id)
     if (error) { setError(error.message); throw error }
     setQuestionarios((prev) => prev.filter((q) => q.id !== id))
   }
 
   async function submeterResposta(r: Resposta) {
+    if (DEMO_MODE) {
+      const saved: Resposta = { ...r, id: `${Date.now()}-demo`, respondentId: null, submetidoEm: new Date().toISOString() }
+      setRespostas((prev) => [...prev, saved])
+      setRespondidosIds((prev) => new Set([...prev, r.questionarioId]))
+      return
+    }
     try {
       const { data: resposta, error: rError } = await supabase
         .from("respostas")
         .insert({
           questionario_id: r.questionarioId,
           respondente_id: userId,
-          respondente_tipo: userTipo,
+          respondente_role: userRole,
         })
         .select("id")
         .single()
@@ -298,7 +344,7 @@ export function QuestionarioProvider({ children, isAdm, hasComissao, comissaoId,
         id: resposta.id as string,
         questionarioId: r.questionarioId,
         respondentId: null,
-        respondentTipo: userTipo,
+        respondentRole: userRole,
         respostas: r.respostas,
         submetidoEm: new Date().toISOString(),
       }
@@ -319,7 +365,7 @@ export function QuestionarioProvider({ children, isAdm, hasComissao, comissaoId,
   }
 
   function jaRespondeu(_respondentId: string, questionarioId: string): boolean {
-    if (!isAdm && !hasComissao) {
+    if (userRole !== "adm" && userRole !== "comissao") {
       return respondidosIds.has(questionarioId)
     }
     return respostas.some((r) => r.questionarioId === questionarioId)

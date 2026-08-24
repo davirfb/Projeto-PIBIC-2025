@@ -98,7 +98,7 @@ export function LogsView({ logs }: LogsViewProps) {
           ) : (
             <div className="space-y-2">
               {filtrados.map((log) => {
-                const { label, color } = PERFIL_CONFIG[log.perfil];
+                const { label, color } = PERFIL_CONFIG[log.perfil ?? "padrao"];
                 return (
                   <div
                     key={log.id}

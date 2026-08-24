@@ -9,7 +9,7 @@ import { LIKERT_ESCALAS } from "@/types/questionario";
 interface ResponderViewProps {
   questionario: Questionario;
   respondentId: string | null;
-  respondentTipo: Resposta["respondentTipo"];
+  respondentRole: Resposta["respondentRole"];
   onSubmit: (r: Resposta) => void;
   onCancelar: () => void;
 }
@@ -122,7 +122,7 @@ function QuestaoDissertativa({
 export function ResponderView({
   questionario,
   respondentId,
-  respondentTipo,
+  respondentRole,
   onSubmit,
   onCancelar,
 }: ResponderViewProps) {
@@ -156,7 +156,7 @@ export function ResponderView({
       id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
       questionarioId: questionario.id,
       respondentId,
-      respondentTipo,
+      respondentRole,
       respostas: questionario.questoes
         .map((q) => respostas[q.id])
         .filter(Boolean),
@@ -183,7 +183,7 @@ export function ResponderView({
           )}
           {questionario.anonimo && (
             <p className="text-xs text-slate-400 mt-1">
-              Este questionário é anônimo — suas respostas não serão identificadas.
+              Este questionario e anonimo. Suas respostas nao serao identificadas.
             </p>
           )}
         </div>

@@ -361,7 +361,7 @@ export function QuestionarioForm({
         </CardContent>
       </Card>
 
-      {/* Cursos Vinculados — RF09 */}
+      {/* Cursos Vinculados (RF09) */}
       <Card className="border-slate-200 shadow-sm bg-white">
         <CardHeader>
           <div className="flex items-center gap-2">

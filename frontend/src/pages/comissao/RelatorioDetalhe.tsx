@@ -1,10 +1,25 @@
-import { ArrowLeft, Download, Printer } from "lucide-react";
+import { ArrowLeft, Download, Printer, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { Questionario, Questao } from "@/types/questionario";
 import type { Resposta } from "@/types/resposta";
+import type { UserRole } from "@/types/user";
 import { LIKERT_ESCALAS } from "@/types/questionario";
+
+const TIPO_LABEL: Record<UserRole, string> = {
+  adm:         "Administrador",
+  comissao:    "Comissão",
+  respondente: "Estudante",
+  padrao:      "Professor / Servidor",
+};
+
+const TIPO_COR_BG: Record<UserRole, string> = {
+  adm:         "bg-slate-100 text-slate-700 border-slate-300",
+  comissao:    "bg-purple-50 text-purple-700 border-purple-200",
+  respondente: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  padrao:      "bg-blue-50 text-blue-700 border-blue-200",
+};
 
 interface RelatorioDetalheProps {
   questionario: Questionario;
@@ -83,7 +98,7 @@ function ResultadoLikert({
     }
   }
 
-  const media = total > 0 ? (soma / total).toFixed(2) : "—";
+  const media = total > 0 ? (soma / total).toFixed(2) : "s/d";
   const maxCount = Math.max(...Object.values(contagem), 1);
 
   return (
@@ -101,7 +116,7 @@ function ResultadoLikert({
           <div key={v} className="space-y-1">
             <div className="flex justify-between text-sm">
               <span className="text-slate-700">
-                {v} — {label}
+                {v}: {label}
               </span>
               <span className="text-slate-500 font-medium">
                 {count} ({Math.round(pct)}%)
@@ -177,12 +192,12 @@ function exportarCSV(questionario: Questionario, respostas: Resposta[]) {
         const pct = cnt > 0 ? ((count / cnt) * 100).toFixed(1) : "0.0";
         linhas.push(`"${questao.enunciado}";likert;${v};${count};${pct}%`);
       }
-      linhas.push(`"${questao.enunciado}";likert;Média;${media};—`);
+      linhas.push(`"${questao.enunciado}";likert;Media;${media};`);
     } else {
       const textos = respostas
         .map((r) => r.respostas.find((rq) => rq.questaoId === questao.id)?.texto)
         .filter((t): t is string => !!t?.trim());
-      linhas.push(`"${questao.enunciado}";dissertativa;"${textos.join(" | ")}";${textos.length};—`);
+      linhas.push(`"${questao.enunciado}";dissertativa;"${textos.join(" | ")}";${textos.length};`);
     }
   }
 
@@ -196,8 +211,13 @@ function exportarCSV(questionario: Questionario, respostas: Resposta[]) {
 }
 
 export function RelatorioDetalhe({ questionario, respostas, onVoltar }: RelatorioDetalheProps) {
-  const totalRespostas = respostas.filter((r) => r.questionarioId === questionario.id).length;
   const respostasDeste = respostas.filter((r) => r.questionarioId === questionario.id);
+  const totalRespostas = respostasDeste.length;
+
+  // Breakdown por perfil para o card de sumário
+  const breakdown = (["respondente", "padrao", "comissao", "adm"] as UserRole[])
+    .map((role) => ({ role, count: respostasDeste.filter((r) => r.respondentRole === role).length }))
+    .filter((x) => x.count > 0);
 
   return (
     <div className="p-8 space-y-8">
@@ -214,7 +234,7 @@ export function RelatorioDetalhe({ questionario, respostas, onVoltar }: Relatori
           <div>
             <h1 className="text-2xl font-semibold text-slate-900">{questionario.titulo}</h1>
             <p className="text-slate-500 text-sm mt-1">
-              {questionario.dataInicio} → {questionario.dataFim} · {totalRespostas} resposta(s)
+              {questionario.dataInicio} ate {questionario.dataFim} | {totalRespostas} resposta(s)
             </p>
           </div>
         </div>
@@ -239,6 +259,32 @@ export function RelatorioDetalhe({ questionario, respostas, onVoltar }: Relatori
           </Button>
         </div>
       </div>
+
+      {/* Card de sumário de participação */}
+      {totalRespostas > 0 && (
+        <Card className="border-slate-200 bg-white shadow-sm">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <Users className="h-4 w-4 text-slate-400" />
+              <CardTitle className="text-sm font-medium text-slate-700">Participação</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-sm text-slate-500">
+                <span className="font-bold text-slate-900 text-xl">{totalRespostas}</span>{" "}
+                resposta(s) coletada(s)
+              </span>
+              <span className="text-slate-200">|</span>
+              {breakdown.map(({ role, count }) => (
+                <Badge key={role} variant="outline" className={`text-xs ${TIPO_COR_BG[role]}`}>
+                  {TIPO_LABEL[role]}: {count}
+                </Badge>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {totalRespostas === 0 ? (
         <Card className="border-slate-200 bg-white shadow-sm">

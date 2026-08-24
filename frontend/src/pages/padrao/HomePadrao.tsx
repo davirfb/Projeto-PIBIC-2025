@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { LogOut, CalendarDays, ClipboardCheck } from "lucide-react";
+import { LogOut, CalendarDays, ClipboardCheck, ShieldCheck } from "lucide-react";
 import logoIFB from "@/assets/logoIFB.png";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -7,16 +7,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useQuestionario } from "@/context/QuestionarioContext";
 import { ResponderView } from "@/pages/respondente/ResponderView";
 import type { Resposta } from "@/types/resposta";
-import type { UserTipo } from "@/types/user";
+import type { UserRole } from "@/types/user";
 
 interface HomePadraoProps {
   onLogout?: () => void;
   userName?: string;
   userId: string;
-  userTipo: UserTipo;
+  userRole: UserRole;
+  onAbrirComissao?: () => void;
 }
 
-export function HomePadrao({ onLogout, userName, userId, userTipo }: HomePadraoProps) {
+export function HomePadrao({ onLogout, userName, userId, userRole, onAbrirComissao }: HomePadraoProps) {
   const [respondendoId, setRespondendoId] = useState<string | null>(null);
 
   const { getQuestionariosVigentes, jaRespondeu, submeterResposta } = useQuestionario();
@@ -38,8 +39,18 @@ export function HomePadrao({ onLogout, userName, userId, userTipo }: HomePadraoP
           <img src={logoIFB} alt="Logo IFB" className="h-9 w-auto" />
           <span className="text-xl font-semibold text-slate-900">Avaliação IFB</span>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <span className="text-sm text-slate-600">{userName ?? "Usuário IFB"}</span>
+          {onAbrirComissao && (
+            <Button
+              size="sm"
+              className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white"
+              onClick={onAbrirComissao}
+            >
+              <ShieldCheck className="h-4 w-4" />
+              Painel da Comissao
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -57,7 +68,7 @@ export function HomePadrao({ onLogout, userName, userId, userTipo }: HomePadraoP
           <ResponderView
             questionario={questionarioAtual}
             respondentId={questionarioAtual.anonimo ? null : userId}
-            respondentTipo={userTipo}
+            respondentRole={userRole}
             onSubmit={handleSubmit}
             onCancelar={() => setRespondendoId(null)}
           />
@@ -100,7 +111,7 @@ export function HomePadrao({ onLogout, userName, userId, userTipo }: HomePadraoP
                             )}
                             <p className="flex items-center gap-1 text-xs text-slate-400">
                               <CalendarDays className="h-3 w-3" />
-                              {q.dataInicio} → {q.dataFim}
+                              {q.dataInicio} ate {q.dataFim}
                             </p>
                           </div>
                           <div className="shrink-0">

@@ -1,4 +1,4 @@
-import type { UserTipo } from "@/types/user"
+import type { UserRole } from "@/types/user"
 
 export interface RespostaQuestao {
   questaoId: string
@@ -11,7 +11,7 @@ export interface Resposta {
   id: string
   questionarioId: string
   respondentId: string | null
-  respondentTipo: UserTipo
+  respondentRole: UserRole
   respostas: RespostaQuestao[]
   submetidoEm: string
 }

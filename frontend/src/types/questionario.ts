@@ -55,7 +55,6 @@ export interface Questionario {
   status: QuestionarioStatus
   questoes: Questao[]
   cursos: string[]
-  comissaoId?: string
   criadoEm: string
   atualizadoEm: string
 }

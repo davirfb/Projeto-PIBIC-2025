@@ -1,13 +1,11 @@
-import type { UserTipo, NivelAcesso } from "@/types/user"
+import type { UserRole, UserSubType } from "@/types/user"
 
 export interface UsuarioAdm {
   id: string
   nome: string
   email: string
-  tipo: UserTipo
-  nivelAcesso: NivelAcesso
-  isAdm: boolean
-  matricula?: string
+  perfil: UserRole
+  subTipo?: UserSubType
   cursoIds: string[]
   ativo: boolean
   criadoEm: string
@@ -31,6 +29,7 @@ export interface LogEntry {
   id: string
   acao: string
   usuario: string
+  perfil?: UserRole
   timestamp: string
 }
 

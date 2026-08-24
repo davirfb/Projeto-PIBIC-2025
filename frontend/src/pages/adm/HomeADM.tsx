@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/services/api";
+import { supabase } from "@/lib/supabase";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -25,7 +25,7 @@ import { ParticipacaoView } from "@/pages/comissao/ParticipacaoView";
 import { RelatoriosView } from "@/pages/comissao/RelatoriosView";
 import { EvolucaoCursoView } from "@/pages/comissao/EvolucaoCursoView";
 import type { UsuarioAdm, Curso, Turma, LogEntry, Configuracoes } from "@/types/adm";
-import type { UserTipo, NivelAcesso } from "@/types/user";
+import type { UserRole, UserSubType } from "@/types/user";
 import type { Questionario } from "@/types/questionario";
 
 type Section = "dashboard" | "usuarios" | "cursos" | "curso_questionarios" | "logs" | "configuracoes";
@@ -48,17 +48,15 @@ function gerarId() {
 }
 
 function fromDbUsuario(raw: Record<string, unknown>): UsuarioAdm {
-  const cursoIds = (raw.usuario_cursos as { curso_id: string }[] ?? []).map((uc) => uc.curso_id);
-  const admRows = raw.adm_sistema as { usuario_id: string }[] | null;
+  const comissaoCursos = (raw.comissao_cursos as { curso_id: string }[] ?? []).map((c) => c.curso_id);
+  const respondenteCursos = (raw.respondente_cursos as { curso_id: string }[] ?? []).map((c) => c.curso_id);
   return {
     id: raw.id as string,
     nome: raw.nome as string,
     email: raw.email as string,
-    tipo: raw.tipo as UserTipo,
-    nivelAcesso: raw.nivel_acesso as NivelAcesso,
-    isAdm: Array.isArray(admRows) && admRows.length > 0,
-    matricula: (raw.matricula as string) ?? undefined,
-    cursoIds,
+    perfil: raw.role as UserRole,
+    subTipo: (raw.sub_type as UserSubType) ?? undefined,
+    cursoIds: [...new Set([...comissaoCursos, ...respondenteCursos])],
     ativo: raw.ativo as boolean,
     criadoEm: String(raw.criado_em),
   };
@@ -88,8 +86,8 @@ export function HomeADM({ onLogout, userName }: HomeADMProps) {
 
   useEffect(() => {
     supabase
-      .from("usuarios")
-      .select("*, usuario_cursos(curso_id), adm_sistema(usuario_id)")
+      .from("profiles")
+      .select("*, comissao_cursos(curso_id), respondente_cursos(curso_id)")
       .then(({ data }) => {
         if (data) setUsuarios((data as Record<string, unknown>[]).map(fromDbUsuario));
       });
@@ -116,36 +114,35 @@ export function HomeADM({ onLogout, userName }: HomeADMProps) {
     try {
       if (existe) {
         const { error } = await supabase
-          .from("usuarios")
+          .from("profiles")
           .update({
             nome: u.nome,
-            tipo: u.tipo,
-            nivel_acesso: u.nivelAcesso,
+            role: u.perfil,
+            sub_type: u.subTipo ?? null,
             ativo: u.ativo,
           })
           .eq("id", u.id);
         if (error) throw error;
 
-        // Sincroniza cursos
-        await supabase.from("usuario_cursos").delete().eq("usuario_id", u.id);
-        if (u.cursoIds.length > 0) {
-          await supabase.from("usuario_cursos").insert(
+        // Sincroniza associações de curso
+        await supabase.from("comissao_cursos").delete().eq("usuario_id", u.id);
+        await supabase.from("respondente_cursos").delete().eq("usuario_id", u.id);
+        if (u.perfil === "comissao" && u.cursoIds.length > 0) {
+          await supabase.from("comissao_cursos").insert(
+            u.cursoIds.map((cid) => ({ usuario_id: u.id, curso_id: cid })),
+          );
+        } else if ((u.perfil === "respondente" || u.perfil === "padrao") && u.cursoIds.length > 0) {
+          await supabase.from("respondente_cursos").insert(
             u.cursoIds.map((cid) => ({ usuario_id: u.id, curso_id: cid })),
           );
         }
 
-        // Sincroniza status de ADM
-        if (u.isAdm) {
-          await supabase.from("adm_sistema").upsert({ usuario_id: u.id });
-        } else {
-          await supabase.from("adm_sistema").delete().eq("usuario_id", u.id);
-        }
-
         const saved = fromDbUsuario({
           ...u,
-          nivel_acesso: u.nivelAcesso,
-          usuario_cursos: u.cursoIds.map((cid) => ({ curso_id: cid })),
-          adm_sistema: u.isAdm ? [{ usuario_id: u.id }] : [],
+          role: u.perfil,
+          sub_type: u.subTipo ?? null,
+          comissao_cursos: u.perfil === "comissao" ? u.cursoIds.map((cid) => ({ curso_id: cid })) : [],
+          respondente_cursos: (u.perfil === "respondente" || u.perfil === "padrao") ? u.cursoIds.map((cid) => ({ curso_id: cid })) : [],
           criado_em: u.criadoEm,
         });
         setUsuarios((prev) => prev.map((p) => (p.id === u.id ? saved : p)));
@@ -156,19 +153,17 @@ export function HomeADM({ onLogout, userName }: HomeADMProps) {
             nome: u.nome,
             email: u.email,
             senha,
-            tipo: u.tipo,
-            nivel_acesso: u.nivelAcesso,
-            is_adm: u.isAdm,
+            role: u.perfil,
+            sub_type: u.subTipo ?? null,
             curso_ids: u.cursoIds,
-            matricula: u.tipo === "aluno" ? u.matricula : undefined,
           },
         });
         if (error) throw error;
         const raw = data as Record<string, unknown>;
         const saved = fromDbUsuario({
           ...raw,
-          usuario_cursos: u.cursoIds.map((cid) => ({ curso_id: cid })),
-          adm_sistema: u.isAdm ? [{ usuario_id: raw.id }] : [],
+          comissao_cursos: u.perfil === "comissao" ? u.cursoIds.map((cid) => ({ curso_id: cid })) : [],
+          respondente_cursos: (u.perfil === "respondente" || u.perfil === "padrao") ? u.cursoIds.map((cid) => ({ curso_id: cid })) : [],
         });
         setUsuarios((prev) => [...prev, saved]);
         registrarLog(`Usuário criado: ${saved.nome} (${saved.email})`);
@@ -197,7 +192,7 @@ export function HomeADM({ onLogout, userName }: HomeADMProps) {
     if (!u) return;
     try {
       const { error } = await supabase
-        .from("usuarios")
+        .from("profiles")
         .update({ ativo: !u.ativo })
         .eq("id", id);
       if (error) throw error;

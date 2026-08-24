@@ -15,7 +15,11 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/services/api";
 
-export function LoginPage() {
+interface LoginPageProps {
+  onShowRegister: () => void;
+}
+
+export function LoginPage({ onShowRegister }: LoginPageProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -146,7 +150,17 @@ export function LoginPage() {
                   "Entrar"
                 )}
               </Button>
-              <p className="text-xs text-slate-500 text-center">
+              <p className="text-sm text-slate-500 text-center">
+                Não tem conta?{" "}
+                <button
+                  type="button"
+                  className="text-emerald-600 hover:underline font-medium"
+                  onClick={onShowRegister}
+                >
+                  Criar conta
+                </button>
+              </p>
+              <p className="text-xs text-slate-400 text-center">
                 Problemas de acesso? Contate a secretaria acadêmica.
               </p>
             </CardFooter>
